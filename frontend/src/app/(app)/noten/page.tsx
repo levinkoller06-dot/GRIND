@@ -1,7 +1,7 @@
 import { TABS } from "@/components/tabs";
 import { createClient } from "@/lib/supabase/server";
 import { formatDay, todayIso } from "@/lib/format";
-import { average, formatGrade, type Grade } from "@/lib/grades";
+import { average, formatGrade, gradeColor, type Grade, type GradeScale } from "@/lib/grades";
 
 const tab = TABS.find((t) => t.href === "/noten")!;
 
@@ -11,14 +11,21 @@ type Exam = { id: string; date: string; topics: string | null; subjects: { name:
 export default async function NotenPage() {
   const supabase = await createClient();
 
-  const [{ data: subjects }, { data: exams }] = await Promise.all([
+  const { data: claims } = await supabase.auth.getClaims();
+  const [{ data: subjects }, { data: exams }, { data: profile }] = await Promise.all([
     supabase.from("subjects").select("id,name,grades(value,weight,kind,date)").order("name"),
     supabase
       .from("exams")
       .select("id,date,topics,subjects(name)")
       .gte("date", todayIso())
       .order("date"),
+    supabase
+      .from("profiles")
+      .select("grade_scale")
+      .eq("id", claims?.claims?.sub ?? "")
+      .maybeSingle(),
   ]);
+  const scale = (profile?.grade_scale ?? "ch") as GradeScale;
 
   const list = (subjects ?? []) as Subject[];
   const upcoming = (exams ?? []) as unknown as Exam[];
@@ -54,7 +61,8 @@ export default async function NotenPage() {
           <h2 className="text-sm font-bold text-muted">Fächer</h2>
           {all.length > 0 && (
             <span className="text-sm text-muted">
-              Gesamtschnitt <b className="text-foreground">{formatGrade(average(all))}</b>
+              Gesamtschnitt{" "}
+              <b className={gradeColor(average(all), scale)}>{formatGrade(average(all))}</b>
             </span>
           )}
         </div>
@@ -69,7 +77,7 @@ export default async function NotenPage() {
               <li key={s.id} className="rounded-2xl border border-border bg-surface p-4">
                 <div className="flex items-baseline justify-between">
                   <span className="font-bold">{s.name}</span>
-                  <span className="text-2xl font-black text-accent">
+                  <span className={`text-2xl font-black ${gradeColor(average(s.grades), scale)}`}>
                     {formatGrade(average(s.grades))}
                   </span>
                 </div>
@@ -80,7 +88,7 @@ export default async function NotenPage() {
                       <span
                         key={i}
                         title={`${g.kind} · ${g.date}`}
-                        className="rounded-md bg-surface-2 px-2 py-0.5 text-sm"
+                        className={`rounded-md bg-surface-2 px-2 py-0.5 text-sm font-medium ${gradeColor(Number(g.value), scale)}`}
                       >
                         {formatGrade(Number(g.value))}
                       </span>

@@ -20,7 +20,15 @@ class LimitReached(Exception):
     pass
 
 
-def system_prompt(now: datetime, name: str | None) -> str:
+GRADE_SCALES = {
+    "ch": "Schweizer Notenskala: 6 ist die beste Note, 5 gut, 4 genügend (knapp bestanden), "
+    "unter 4 ungenügend, 1 die schlechteste. Eine 6 ist also super, eine 3 ist schlecht.",
+    "de": "Deutsche Notenskala: 1 ist die beste Note, 2 gut, 3 befriedigend, 4 ausreichend, "
+    "5 mangelhaft, 6 die schlechteste.",
+}
+
+
+def system_prompt(now: datetime, name: str | None, grade_scale: str = "ch") -> str:
     days = "\n".join(
         f"- {WEEKDAYS[d.weekday()]}: {d.isoformat()}"
         for d in (now.date() + timedelta(days=i) for i in range(8))
@@ -33,11 +41,16 @@ Die nächsten Tage:
 {days}
 „Donnerstag“ meint immer den nächsten Donnerstag ab heute (heute zählt, wenn heute Donnerstag ist und der Kontext passt).
 
+Noten: {GRADE_SCALES.get(grade_scale, GRADE_SCALES["ch"])}
+Bewerte Noten und Schnitte immer nach dieser Skala.
+
 Regeln:
 - Eine Nachricht kann mehrere Dinge enthalten. Erledige alle mit den passenden Tools, gern mehrere Tools auf einmal.
 - Termine werden nie direkt eingetragen, sondern nur vorgeschlagen. Der Nutzer bestätigt sie in der App.
   Sag also z. B. „Hab dir den Termin zum Bestätigen hingelegt“, nie „eingetragen“.
 - Tests/Klassenarbeiten immer mit test_anlegen, nicht mit termin_vorschlagen.
+- Bei Terminen Ort („ort“) und Personen („mit“) mitgeben, wenn der Nutzer sie nennt
+  („Kino mit Tim und Lea im Pathé“ → mit: ["Tim", "Lea"], ort: "Pathé").
 - Erfinde keine Daten. Wenn etwas Wichtiges fehlt (z. B. welches Fach), frag kurz nach.
 - Wenn es kein passendes Tool gibt, sag ehrlich, dass du das noch nicht kannst.
 - Antworte kurz: 1–3 Sätze, Emojis sparsam."""
@@ -105,7 +118,7 @@ async def chat(db: Db, llm: Gemini, message: str) -> dict:
 
     ctx = ToolContext(db=db, tz=tz, now=now)
     declarations = [t.declaration() for t in REGISTRY.values()]
-    system = system_prompt(now, profile.get("display_name"))
+    system = system_prompt(now, profile.get("display_name"), profile.get("grade_scale") or "ch")
     tools_used: list[str] = []
     reply = ""
 

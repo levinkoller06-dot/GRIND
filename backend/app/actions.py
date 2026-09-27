@@ -23,6 +23,8 @@ async def _create_event(db: Db, payload: dict, tz: ZoneInfo) -> dict:
             "all_day": all_day,
             "kind": payload.get("art", "termin"),
             "notes": payload.get("notiz"),
+            "location": payload.get("ort"),
+            "participants": payload.get("mit") or [],
             "exam_id": payload.get("exam_id"),
         },
     )
@@ -30,7 +32,7 @@ async def _create_event(db: Db, payload: dict, tz: ZoneInfo) -> dict:
 
 EXECUTORS = {"event.create": _create_event}
 
-EDITABLE = {"titel", "datum", "uhrzeit", "ende_uhrzeit", "art", "notiz"}
+EDITABLE = {"titel", "datum", "uhrzeit", "ende_uhrzeit", "art", "notiz", "ort", "mit"}
 
 
 async def decide(db: Db, action_id: str, confirm: bool, changes: dict, tz: ZoneInfo) -> dict:
@@ -49,7 +51,7 @@ async def decide(db: Db, action_id: str, confirm: bool, changes: dict, tz: ZoneI
         return {"status": "rejected"}
 
     payload = action["payload"] | {k: v for k, v in changes.items() if k in EDITABLE}
-    payload = {k: v for k, v in payload.items() if v not in (None, "")}
+    payload = {k: v for k, v in payload.items() if v not in (None, "", [])}
     executor = EXECUTORS.get(action["kind"])
     if executor is None:
         raise ActionError(f"Unbekannte Aktion: {action['kind']}")

@@ -117,3 +117,29 @@ def test_ablehnen():
     run(actions.decide(db, pending["id"], False, {}, TZ))
     assert db.tables["pending_actions"][0]["status"] == "rejected"
     assert "events" not in db.tables
+
+
+def test_ort_und_personen():
+    db = FakeDb()
+    llm = FakeLlm(
+        calls(
+            (
+                "termin_vorschlagen",
+                {"titel": "Kino", "datum": "2026-10-03", "ort": "Pathé", "mit": ["Tim", "Lea"]},
+            )
+        ),
+        text("ok"),
+    )
+    pending = run(harness.chat(db, llm, "Samstag Kino mit Tim und Lea im Pathé"))["pending"][0]
+    run(actions.decide(db, pending["id"], True, {"mit": ["Tim"]}, TZ))
+    event = db.tables["events"][0]
+    assert event["location"] == "Pathé"
+    assert event["participants"] == ["Tim"]
+
+
+def test_notenskala_im_prompt():
+    from datetime import datetime
+
+    now = datetime(2026, 9, 27, 12, tzinfo=TZ)
+    assert "6 ist die beste" in harness.system_prompt(now, None, "ch")
+    assert "1 ist die beste" in harness.system_prompt(now, None, "de")

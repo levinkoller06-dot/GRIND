@@ -22,7 +22,10 @@ def event_times(payload: dict, tz: ZoneInfo) -> tuple[datetime, datetime | None,
 
 def describe(payload: dict) -> str:
     when = payload["datum"] + (f" {payload['uhrzeit']}" if payload.get("uhrzeit") else "")
-    return f"Termin „{payload['titel']}“ am {when}."
+    extra = (f" in/bei {payload['ort']}" if payload.get("ort") else "") + (
+        f" mit {', '.join(payload['mit'])}" if payload.get("mit") else ""
+    )
+    return f"Termin „{payload['titel']}“ am {when}{extra}."
 
 
 @tool(
@@ -36,13 +39,22 @@ def describe(payload: dict) -> str:
             "uhrzeit": {"type": "string", "description": "Startzeit HH:MM, weglassen = ganztägig"},
             "ende_uhrzeit": {"type": "string", "description": "Endzeit HH:MM (optional)"},
             "art": {"type": "string", "enum": KINDS},
+            "ort": {
+                "type": "string",
+                "description": "Wo, z. B. 'Kino Pathé' oder 'Zahnarzt Dr. Meier'",
+            },
+            "mit": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Mit wem, z. B. ['Tim', 'Lea']",
+            },
             "notiz": {"type": "string"},
         },
         ["titel", "datum"],
     ),
 )
 async def termin_vorschlagen(ctx: ToolContext, args: dict) -> dict:
-    payload = {k: v for k, v in args.items() if v not in (None, "")}
+    payload = {k: v for k, v in args.items() if v not in (None, "", [])}
     payload.setdefault("art", "termin")
     event_times(payload, ctx.tz)  # prüft das Format, bevor der Vorschlag entsteht
     return await propose(ctx, "event.create", payload, describe(payload))
@@ -64,7 +76,7 @@ async def termine_abfragen(ctx: ToolContext, args: dict) -> dict:
     end = date.fromisoformat(args.get("bis") or (today + timedelta(days=14)).isoformat())
     rows = await ctx.db.select(
         "events",
-        select="title,starts_at,ends_at,all_day,kind",
+        select="title,starts_at,ends_at,all_day,kind,location,participants",
         order="starts_at",
         **{
             "starts_at": f"gte.{datetime.combine(start, time.min, ctx.tz).isoformat()}",

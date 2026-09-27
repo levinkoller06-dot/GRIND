@@ -10,6 +10,8 @@ export type EventPayload = {
   ende_uhrzeit?: string;
   art?: string;
   notiz?: string;
+  ort?: string;
+  mit?: string[];
 };
 
 export type PendingAction = {

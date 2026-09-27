@@ -22,7 +22,9 @@ export function PendingCard({ action, onDone }: Props) {
       if (confirm) {
         await api(`/pending/${action.id}/confirm`, {
           method: "POST",
-          body: JSON.stringify({ changes: draft }),
+          body: JSON.stringify({
+            changes: { ...draft, mit: (draft.mit ?? []).map((n) => n.trim()).filter(Boolean) },
+          }),
         });
       } else {
         await api(`/pending/${action.id}/reject`, { method: "POST" });
@@ -70,6 +72,23 @@ export function PendingCard({ action, onDone }: Props) {
               aria-label="Ende"
             />
           </div>
+          <input
+            className={field}
+            placeholder="📍 Wo?"
+            value={draft.ort ?? ""}
+            onChange={(e) => setDraft({ ...draft, ort: e.target.value })}
+          />
+          <input
+            className={field}
+            placeholder="👥 Mit wem? (mit Komma trennen)"
+            value={(draft.mit ?? []).join(", ")}
+            onChange={(e) =>
+              setDraft({
+                ...draft,
+                mit: e.target.value.split(",").map((n) => n.trimStart()),
+              })
+            }
+          />
         </div>
       ) : (
         <div className="mt-1">
@@ -77,6 +96,10 @@ export function PendingCard({ action, onDone }: Props) {
             {KIND_ICON[p.art ?? "termin"]} {p.titel}
           </div>
           <div className="text-sm text-muted">{formatWhen(p)}</div>
+          {p.ort && <div className="text-sm text-muted">📍 {p.ort}</div>}
+          {p.mit && p.mit.some(Boolean) && (
+            <div className="text-sm text-muted">👥 {p.mit.filter(Boolean).join(", ")}</div>
+          )}
           {p.notiz && <div className="mt-1 text-sm text-muted">{p.notiz}</div>}
         </div>
       )}
