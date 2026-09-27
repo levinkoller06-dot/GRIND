@@ -9,6 +9,15 @@ export async function updateSession(request: NextRequest) {
 
   if (!isSupabaseConfigured) return response;
 
+  // Ist die Callback-URL in Supabase nicht erlaubt, landet der Bestätigungslink
+  // auf der Site URL. Dann den Code trotzdem an den Callback weitergeben.
+  const { pathname, searchParams } = request.nextUrl;
+  if (!pathname.startsWith("/auth") && (searchParams.has("code") || searchParams.has("token_hash"))) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/callback";
+    return NextResponse.redirect(url);
+  }
+
   const supabase = createServerClient(supabaseUrl, supabaseKey, {
     cookies: {
       getAll() {
@@ -32,8 +41,7 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const loggedIn = Boolean(data?.claims);
 
-  const path = request.nextUrl.pathname;
-  const isPublic = PUBLIC_PATHS.some((p) => path.startsWith(p));
+  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
   if (!loggedIn && !isPublic) {
     const url = request.nextUrl.clone();
@@ -41,7 +49,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (loggedIn && path === "/login") {
+  if (loggedIn && pathname === "/login") {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);
