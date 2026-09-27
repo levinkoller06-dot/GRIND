@@ -2,7 +2,7 @@
 
 Alltags-App für Schule, Gym und Leben – für mehrere Nutzer, mit einer KI im Zentrum, die alles selbst einsortiert.
 
-**Status:** Planung – siehe [docs/PLANUNG.md](docs/PLANUNG.md)
+**Status:** Phase 0 (Grundgerüst) · [Planung](docs/PLANUNG.md) · [Einrichtung](docs/SETUP.md)
 
 ## Konzept
 
