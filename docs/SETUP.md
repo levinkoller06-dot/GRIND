@@ -9,7 +9,7 @@
 ## 1. Supabase-Projekt anlegen
 
 1. Auf supabase.com ein neues Projekt erstellen (Region: Frankfurt / `eu-central-1`).
-2. **SQL Editor** öffnen und den Inhalt von
+2. **SQL Editor** öffnen und **nacheinander alle Dateien** aus `supabase/migrations/` ausführen, angefangen mit
    [`supabase/migrations/20260927000000_grundlage.sql`](../supabase/migrations/20260927000000_grundlage.sql)
    einfügen und ausführen.
 3. **Project Settings → API**: die **Project URL** und den **Publishable Key** (`sb_publishable_...`) kopieren.
@@ -23,7 +23,7 @@
 
 ```bash
 cd backend
-cp .env.example .env      # SUPABASE_URL und SUPABASE_PUBLISHABLE_KEY eintragen
+cp .env.example .env      # SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY und GEMINI_API_KEY eintragen
 uv sync
 uv run uvicorn app.main:app --reload --port 8000
 ```
