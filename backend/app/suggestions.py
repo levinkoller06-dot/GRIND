@@ -3,7 +3,7 @@
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from app.db import Db
+from app.db import Db, DbError
 from app.llm import Gemini
 from app.tools.essen import totals
 from app.tools.gym import WEEKDAYS
@@ -55,7 +55,10 @@ async def suggestions(db: Db, llm: Gemini, tz: ZoneInfo) -> dict:
     )
     profiles = await db.select("profiles", select="goal_kcal,goal_protein_g", id=f"eq.{db.user.id}")
     goals = profiles[0] if profiles else {}
-    plan = await db.select("training_plans", select="days", user_id=f"eq.{db.user.id}")
+    try:
+        plan = await db.select("training_plans", select="days", user_id=f"eq.{db.user.id}")
+    except DbError:  # Trainingsplan-Tabelle (noch) nicht vorhanden
+        plan = []
     today_plan = _plan_for(plan[0]["days"] if plan else [], today)
 
     eaten = totals([i for m in meals for i in m["meal_items"]])

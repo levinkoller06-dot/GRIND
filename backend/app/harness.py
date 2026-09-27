@@ -152,7 +152,7 @@ async def chat(db: Db, llm: Gemini, message: str, image: dict | None = None) -> 
 
     ctx = ToolContext(db=db, tz=tz, now=now, grade_scale=profile.get("grade_scale") or "ch")
     declarations = [t.declaration() for t in REGISTRY.values()]
-    subjects = await db.select("subjects", select="name,aliases", order="name")
+    subjects = await db.select("subjects", order="name")
     system = system_prompt(
         now, profile.get("display_name"), profile.get("grade_scale") or "ch", subjects
     )
