@@ -1,7 +1,13 @@
 import { createClient } from "@/lib/supabase/client";
 import { apiUrl } from "@/lib/supabase/config";
 
-export type ChatMessage = { id?: number; role: "user" | "assistant"; content: string };
+export type ChatMessage = {
+  id?: number;
+  role: "user" | "assistant";
+  content: string;
+  /** Nur lokal zur Anzeige, wird nicht gespeichert */
+  image?: string;
+};
 
 export type EventPayload = {
   titel: string;

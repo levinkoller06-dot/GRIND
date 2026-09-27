@@ -50,6 +50,14 @@ class Db:
         )
         return self._check(res)[0]
 
+    async def insert_many(self, table: str, rows: list[dict]) -> list[dict]:
+        if not rows:
+            return []
+        res = await self._http.post(
+            f"/{table}", json=rows, headers={"Prefer": "return=representation"}
+        )
+        return self._check(res)
+
     async def update(self, table: str, values: dict, **filters: str) -> list[dict]:
         res = await self._http.patch(
             f"/{table}", json=values, params=filters, headers={"Prefer": "return=representation"}

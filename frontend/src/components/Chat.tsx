@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, type ChatMessage, type ChatResponse, type PendingAction } from "@/lib/api";
+import { prepareImage, type ChatImage } from "@/lib/image";
 import { PendingCard } from "./PendingCard";
 
 const EXAMPLES = [
   "Donnerstag ist Mathetest über Brüche",
-  "Hab ne 2 in Englisch bekommen",
-  "Wie steh ich in Mathe?",
+  "Hab 3×10 Liegestütze gemacht",
+  "Mittag gab's Nudeln mit Hähnchen",
+  "Wie viel Protein hatte ich heute?",
 ];
 
 export function Chat() {
@@ -18,7 +20,18 @@ export function Chat() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [image, setImage] = useState<ChatImage | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  async function pickImage(file: File | undefined) {
+    if (!file) return;
+    try {
+      setImage(await prepareImage(file));
+    } catch {
+      setError("Foto konnte nicht gelesen werden");
+    }
+  }
 
   useEffect(() => {
     Promise.all([api<ChatMessage[]>("/chat/history"), api<PendingAction[]>("/pending")])
@@ -34,16 +47,21 @@ export function Chat() {
   }, [messages, pending, busy]);
 
   async function send(text: string) {
-    const message = text.trim();
+    const photo = image;
+    const message = text.trim() || (photo ? "Was hab ich hier gegessen? Trag es ein." : "");
     if (!message || busy) return;
     setInput("");
+    setImage(null);
     setError(null);
     setBusy(true);
-    setMessages((m) => [...m, { role: "user", content: message }]);
+    setMessages((m) => [...m, { role: "user", content: message, image: photo?.preview }]);
     try {
       const res = await api<ChatResponse>("/chat", {
         method: "POST",
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({
+          message,
+          image: photo ? { mime_type: photo.mime_type, data: photo.data } : null,
+        }),
       });
       setMessages((m) => [...m, { role: "assistant", content: res.reply }]);
       setPending((p) => [...p, ...res.pending]);
@@ -79,6 +97,10 @@ export function Chat() {
                 : "self-start rounded-bl-sm bg-surface-2"
             }`}
           >
+            {m.image && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={m.image} alt="" className="mb-1 max-h-48 rounded-lg" />
+            )}
             {m.content}
           </div>
         ))}
@@ -109,6 +131,16 @@ export function Chat() {
         </div>
       )}
 
+      {image && (
+        <div className="mt-3 flex items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={image.preview} alt="Ausgewähltes Foto" className="h-16 rounded-lg" />
+          <button onClick={() => setImage(null)} className="text-sm text-muted hover:underline">
+            entfernen
+          </button>
+        </div>
+      )}
+
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -117,13 +149,33 @@ export function Chat() {
         className="mt-3 flex gap-2"
       >
         <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Schreib dem Gehirn …"
-          className="flex-1 rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-accent"
+          ref={fileInput}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => {
+            pickImage(e.target.files?.[0]);
+            e.target.value = "";
+          }}
         />
         <button
-          disabled={busy || !input.trim()}
+          type="button"
+          onClick={() => fileInput.current?.click()}
+          className="rounded-xl border border-border px-3 text-lg hover:bg-surface-2"
+          aria-label="Foto vom Essen"
+          title="Foto vom Essen"
+        >
+          📷
+        </button>
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={image ? "Was ist drauf? (optional)" : "Schreib dem Gehirn …"}
+          className="min-w-0 flex-1 rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-accent"
+        />
+        <button
+          disabled={busy || (!input.trim() && !image)}
           className="rounded-xl bg-accent px-4 font-bold text-accent-fg disabled:opacity-50"
           aria-label="Senden"
         >

@@ -53,14 +53,21 @@ async def me(db: DbDep) -> dict:
     return {"user_id": db.user.id, "email": db.user.email, "profile": rows[0] if rows else None}
 
 
+class ImageIn(BaseModel):
+    mime_type: str = Field(pattern=r"^image/(jpeg|png|webp)$")
+    data: str = Field(max_length=4_000_000)  # base64, ca. 3 MB
+
+
 class ChatIn(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
+    image: ImageIn | None = None
 
 
 @app.post("/chat")
 async def chat(body: ChatIn, db: DbDep, llm: Annotated[Gemini, Depends(get_llm)]) -> dict:
     try:
-        return await harness.chat(db, llm, body.message.strip())
+        image = body.image.model_dump() if body.image else None
+        return await harness.chat(db, llm, body.message.strip(), image)
     except harness.LimitReached as e:
         raise HTTPException(429, str(e)) from e
     except LlmError as e:

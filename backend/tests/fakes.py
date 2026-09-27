@@ -1,4 +1,5 @@
 import itertools
+import re
 import uuid
 from dataclasses import dataclass
 
@@ -31,10 +32,15 @@ class FakeDb:
 
     async def select(self, table: str, **params: str) -> list[dict]:
         rows = [r for r in self.tables.get(table, []) if self._match(r, params)]
-        if table == "subjects" and "grades(" in params.get("select", ""):
-            grades = self.tables.get("grades", [])
-            rows = [r | {"grades": [g for g in grades if g["subject_id"] == r["id"]]} for r in rows]
+        # Eingebettete Tabellen wie "meal_items(kcal)": Fremdschlüssel = <tabelle ohne s>_id
+        fk = f"{table[:-1]}_id"
+        for child in re.findall(r"(\w+)\(", params.get("select", "")):
+            children = self.tables.get(child, [])
+            rows = [r | {child: [c for c in children if c.get(fk) == r["id"]]} for r in rows]
         return [dict(r) for r in rows]
+
+    async def insert_many(self, table: str, rows: list[dict]) -> list[dict]:
+        return [await self.insert(table, r) for r in rows]
 
     async def insert(self, table: str, row: dict) -> dict:
         row = {"id": str(uuid.uuid4()), "status": "open", "weight": 1} | row

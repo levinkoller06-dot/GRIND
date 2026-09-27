@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { BackendStatus } from "@/components/BackendStatus";
 import { Chat } from "@/components/Chat";
 import { TZ, dayEnd, dayStart, formatDay, todayIso } from "@/lib/format";
+import { round, sum, type MealItem } from "@/lib/nutrition";
 
 export default async function StartPage() {
   const supabase = await createClient();
@@ -9,9 +10,19 @@ export default async function StartPage() {
   const userId = data?.claims?.sub;
   const today = todayIso();
 
-  const [{ data: profile }, { data: exams }, { count: openCount }, { count: eventsToday }] =
-    await Promise.all([
-      supabase.from("profiles").select("display_name").eq("id", userId ?? "").maybeSingle(),
+  const [
+    { data: profile },
+    { data: exams },
+    { count: openCount },
+    { count: eventsToday },
+    { data: meals },
+    { data: workouts },
+  ] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("display_name, goal_protein_g")
+        .eq("id", userId ?? "")
+        .maybeSingle(),
       supabase.from("exams").select("date, subjects(name)").gte("date", today).order("date").limit(1),
       supabase
         .from("pending_actions")
@@ -22,7 +33,20 @@ export default async function StartPage() {
         .select("id", { count: "exact", head: true })
         .gte("starts_at", dayStart(today))
         .lte("starts_at", dayEnd(today)),
+      supabase
+        .from("meals")
+        .select("meal_items(name,amount,kcal,protein_g,carbs_g,fat_g)")
+        .gte("eaten_at", dayStart(today))
+        .lte("eaten_at", dayEnd(today)),
+      supabase.from("workouts").select("workout_entries(exercise)").eq("date", today),
     ]);
+
+  const protein = sum(
+    (meals ?? []).flatMap((m) => m.meal_items as unknown as MealItem[]),
+  ).protein_g;
+  const exercises = (workouts ?? []).flatMap(
+    (w) => (w.workout_entries as unknown as { exercise: string }[]).map((e) => e.exercise),
+  );
 
   const nextExam = exams?.[0] as unknown as
     | { date: string; subjects: { name: string } | null }
@@ -42,8 +66,17 @@ export default async function StartPage() {
       value: nextExam ? `${nextExam.subjects?.name ?? "?"} · ${formatDay(nextExam.date)}` : "keiner",
     },
     { icon: "📅", label: "Termine heute", value: String(eventsToday ?? 0) },
+    {
+      icon: "💪",
+      label: "Training heute",
+      value: exercises.length ? exercises.join(", ") : "noch keins",
+    },
+    {
+      icon: "🍗",
+      label: "Protein heute",
+      value: `${round(protein)}${profile?.goal_protein_g ? ` / ${profile.goal_protein_g}` : ""} g`,
+    },
     { icon: "✅", label: "Zu bestätigen", value: String(openCount ?? 0) },
-    { icon: "💪", label: "Training heute", value: "–" },
   ];
 
   return (

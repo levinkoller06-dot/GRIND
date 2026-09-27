@@ -9,7 +9,7 @@ export default async function EinstellungenPage() {
   const { data } = await supabase.auth.getClaims();
   const { data: profile } = await supabase
     .from("profiles")
-    .select("display_name, grade_scale")
+    .select("display_name, grade_scale, goal_kcal, goal_protein_g")
     .eq("id", data?.claims?.sub ?? "")
     .maybeSingle();
 
@@ -40,6 +40,16 @@ export default async function EinstellungenPage() {
             ))}
           </select>
         </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block space-y-1">
+            <span className="text-sm text-muted">Ziel Kalorien / Tag</span>
+            <input name="goal_kcal" type="number" min={0} defaultValue={profile?.goal_kcal ?? ""} className={field} />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm text-muted">Ziel Protein (g) / Tag</span>
+            <input name="goal_protein_g" type="number" min={0} defaultValue={profile?.goal_protein_g ?? ""} className={field} />
+          </label>
+        </div>
         <button className="rounded-xl bg-accent px-4 py-2 text-sm font-bold text-accent-fg">
           Speichern
         </button>

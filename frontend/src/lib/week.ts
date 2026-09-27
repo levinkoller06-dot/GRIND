@@ -36,6 +36,10 @@ export function minutesOfDay(iso: string) {
   return h * 60 + m;
 }
 
+export function weekdayShort(isoDate: string) {
+  return WEEKDAYS_SHORT[(new Date(`${isoDate}T00:00:00Z`).getUTCDay() + 6) % 7];
+}
+
 export function formatShort(isoDate: string) {
   const [, m, d] = isoDate.split("-");
   return `${d}.${m}.`;

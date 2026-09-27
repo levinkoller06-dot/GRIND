@@ -51,6 +51,13 @@ Regeln:
 - Tests/Klassenarbeiten immer mit test_anlegen, nicht mit termin_vorschlagen.
 - Bei Terminen Ort („ort“) und Personen („mit“) mitgeben, wenn der Nutzer sie nennt
   („Kino mit Tim und Lea im Pathé“ → mit: ["Tim", "Lea"], ort: "Pathé").
+- Training: „3×10 Liegestütze“ → saetze 3, wiederholungen 10. Mehrere Übungen in ein Training.
+  Neue Rekorde feiern!
+- Essen: Nährwerte selbst realistisch schätzen und mit mahlzeit_eintragen speichern, nicht nachfragen,
+  außer die Menge ist völlig unklar. Bei einem Foto: erkennen, was drauf ist, schätzen, eintragen
+  (vom_foto: true). Danach kurz Kalorien/Protein nennen und wie weit es bis zum Tagesziel ist.
+- Hat der Nutzer sich vertan („nee, das war gestern“), den falschen Eintrag mit eintrag_loeschen
+  entfernen und neu eintragen.
 - Erfinde keine Daten. Wenn etwas Wichtiges fehlt (z. B. welches Fach), frag kurz nach.
 - Wenn es kein passendes Tool gibt, sag ehrlich, dass du das noch nicht kannst.
 - Antworte kurz: 1–3 Sätze, Emojis sparsam."""
@@ -104,7 +111,8 @@ async def run_tool(ctx: ToolContext, call: dict) -> dict:
     return result
 
 
-async def chat(db: Db, llm: Gemini, message: str) -> dict:
+async def chat(db: Db, llm: Gemini, message: str, image: dict | None = None) -> dict:
+    """`image`: optionales Foto als {"mime_type": ..., "data": <base64>}."""
     profiles = await db.select("profiles", id=f"eq.{db.user.id}")
     profile = profiles[0] if profiles else {}
     tz = ZoneInfo(profile.get("timezone") or "Europe/Berlin")
@@ -113,8 +121,13 @@ async def chat(db: Db, llm: Gemini, message: str) -> dict:
     await check_limit(db, now, profile.get("ai_daily_limit") or 100)
 
     contents = await load_history(db)
-    contents.append({"role": "user", "parts": [{"text": message}]})
-    await db.insert("chat_messages", {"user_id": db.user.id, "role": "user", "content": message})
+    parts: list[dict] = [{"text": message}]
+    if image:
+        parts.append({"inlineData": {"mimeType": image["mime_type"], "data": image["data"]}})
+    contents.append({"role": "user", "parts": parts})
+    # Fotos werden nicht gespeichert, im Verlauf steht nur ein Hinweis
+    stored = f"📷 {message}" if image else message
+    await db.insert("chat_messages", {"user_id": db.user.id, "role": "user", "content": stored})
 
     ctx = ToolContext(db=db, tz=tz, now=now)
     declarations = [t.declaration() for t in REGISTRY.values()]

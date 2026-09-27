@@ -11,6 +11,7 @@ import {
   layoutDay,
   minutesOfDay,
   mondayOf,
+  weekdayShort,
 } from "@/lib/week";
 
 const tab = TABS.find((t) => t.href === "/kalender")!;
@@ -218,7 +219,7 @@ export default async function KalenderPage({ searchParams }: PageProps<"/kalende
             <div key={e.id} className="flex gap-3 rounded-2xl border border-border bg-surface p-3">
               <div className="w-10 shrink-0 text-center">
                 <div className="text-xs text-muted">
-                  {WEEKDAYS_SHORT[(new Date(`${d}T00:00:00Z`).getUTCDay() + 6) % 7]}
+                  {weekdayShort(d)}
                 </div>
                 <div className="font-bold">{Number(d.slice(8))}</div>
               </div>
