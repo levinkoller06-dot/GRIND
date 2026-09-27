@@ -1,14 +1,15 @@
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app import actions, harness
 from app.auth import UserDep
 from app.config import Settings, get_settings
-from app.db import Db
+from app.db import Db, DbError
 from app.llm import Gemini, LlmError
 
 app = FastAPI(title="GRIND Backend")
@@ -19,6 +20,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(DbError)
+async def db_error(_: Request, exc: DbError) -> JSONResponse:
+    # Fehlt eine Tabelle/Spalte, wurde meist eine Migration noch nicht ausgeführt
+    missing = "PGRST204" in str(exc) or "PGRST205" in str(exc) or "42703" in str(exc)
+    detail = (
+        "Datenbank ist nicht aktuell: bitte die neuen SQL-Dateien aus supabase/migrations ausführen."
+        if missing
+        else f"Datenbank-Fehler: {exc}"
+    )
+    return JSONResponse({"detail": detail}, status_code=500)
+
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 

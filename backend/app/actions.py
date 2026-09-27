@@ -13,21 +13,21 @@ class ActionError(Exception):
 
 async def _create_event(db: Db, payload: dict, tz: ZoneInfo) -> dict:
     start, end, all_day = event_times(payload, tz)
-    return await db.insert(
-        "events",
-        {
-            "user_id": db.user.id,
-            "title": payload["titel"],
-            "starts_at": start.isoformat(),
-            "ends_at": end.isoformat() if end else None,
-            "all_day": all_day,
-            "kind": payload.get("art", "termin"),
-            "notes": payload.get("notiz"),
-            "location": payload.get("ort"),
-            "participants": payload.get("mit") or [],
-            "exam_id": payload.get("exam_id"),
-        },
-    )
+    row = {
+        "user_id": db.user.id,
+        "title": payload["titel"],
+        "starts_at": start.isoformat(),
+        "ends_at": end.isoformat() if end else None,
+        "all_day": all_day,
+        "kind": payload.get("art", "termin"),
+        "notes": payload.get("notiz"),
+        "exam_id": payload.get("exam_id"),
+    }
+    if payload.get("ort"):
+        row["location"] = payload["ort"]
+    if payload.get("mit"):
+        row["participants"] = payload["mit"]
+    return await db.insert("events", row)
 
 
 EXECUTORS = {"event.create": _create_event}

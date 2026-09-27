@@ -12,6 +12,22 @@ async def get_or_create_subject(ctx: ToolContext, name: str) -> dict:
     return await ctx.db.insert("subjects", {"user_id": ctx.db.user.id, "name": name})
 
 
+def rating(value: float | None, scale: str) -> str | None:
+    """Bewertung einer Note in Worten, unabhängig von der Skala."""
+    if value is None:
+        return None
+    points = float(value) if scale == "ch" else 7 - float(value)  # höher = besser
+    if points >= 5.5:
+        return "sehr gut"
+    if points >= 4.75:
+        return "gut"
+    if points >= 4:
+        return "genügend (bestanden)"
+    if points >= 3:
+        return "ungenügend"
+    return "schlecht"
+
+
 def average(grades: list[dict]) -> float | None:
     total_weight = sum(float(g["weight"]) for g in grades)
     if not total_weight:
@@ -49,11 +65,14 @@ async def note_eintragen(ctx: ToolContext, args: dict) -> dict:
         },
     )
     grades = await ctx.db.select("grades", subject_id=f"eq.{subject['id']}")
+    avg = average(grades)
     return {
         "gespeichert": True,
         "fach": subject["name"],
         "note": grade["value"],
-        "neuer_schnitt": average(grades),
+        "bewertung": rating(grade["value"], ctx.grade_scale),
+        "neuer_schnitt": avg,
+        "bewertung_schnitt": rating(avg, ctx.grade_scale),
     }
 
 
@@ -69,7 +88,12 @@ async def noten_abfragen(ctx: ToolContext, args: dict) -> dict:
     )
     return {
         "faecher": [
-            {"fach": s["name"], "noten": s["grades"], "schnitt": average(s["grades"])}
+            {
+                "fach": s["name"],
+                "noten": s["grades"],
+                "schnitt": average(s["grades"]),
+                "bewertung_schnitt": rating(average(s["grades"]), ctx.grade_scale),
+            }
             for s in subjects
         ]
     }

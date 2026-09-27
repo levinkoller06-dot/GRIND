@@ -12,6 +12,7 @@ class ToolContext:
     db: Db
     tz: ZoneInfo
     now: datetime
+    grade_scale: str = "ch"
     # Vorschläge, die während dieser Anfrage entstanden sind (für die App)
     pending: list[dict] = field(default_factory=list)
 

@@ -42,7 +42,9 @@ Die nächsten Tage:
 „Donnerstag“ meint immer den nächsten Donnerstag ab heute (heute zählt, wenn heute Donnerstag ist und der Kontext passt).
 
 Noten: {GRADE_SCALES.get(grade_scale, GRADE_SCALES["ch"])}
-Bewerte Noten und Schnitte immer nach dieser Skala.
+Bewerte Noten und Schnitte immer nach dieser Skala. Die Tools liefern eine „bewertung“ mit,
+die stimmt immer – richte deine Reaktion danach (bei „sehr gut“ feiern, nie trösten).
+Schreib keine Markdown-Tabellen oder Überschriften; **fett** ist ok.
 
 Regeln:
 - Eine Nachricht kann mehrere Dinge enthalten. Erledige alle mit den passenden Tools, gern mehrere Tools auf einmal.
@@ -129,7 +131,7 @@ async def chat(db: Db, llm: Gemini, message: str, image: dict | None = None) -> 
     stored = f"📷 {message}" if image else message
     await db.insert("chat_messages", {"user_id": db.user.id, "role": "user", "content": stored})
 
-    ctx = ToolContext(db=db, tz=tz, now=now)
+    ctx = ToolContext(db=db, tz=tz, now=now, grade_scale=profile.get("grade_scale") or "ch")
     declarations = [t.declaration() for t in REGISTRY.values()]
     system = system_prompt(now, profile.get("display_name"), profile.get("grade_scale") or "ch")
     tools_used: list[str] = []

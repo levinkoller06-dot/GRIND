@@ -13,6 +13,17 @@ const EXAMPLES = [
   "Wie viel Protein hatte ich heute?",
 ];
 
+/** Zeigt **fett** aus KI-Antworten als fetten Text an. */
+function RichText({ text }: { text: string }) {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+    part.startsWith("**") && part.endsWith("**") ? (
+      <strong key={i}>{part.slice(2, -2)}</strong>
+    ) : (
+      part
+    ),
+  );
+}
+
 export function Chat() {
   const router = useRouter();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -101,7 +112,7 @@ export function Chat() {
               // eslint-disable-next-line @next/next/no-img-element
               <img src={m.image} alt="" className="mb-1 max-h-48 rounded-lg" />
             )}
-            {m.content}
+            {m.role === "assistant" ? <RichText text={m.content} /> : m.content}
           </div>
         ))}
         {busy && (

@@ -143,3 +143,47 @@ def test_notenskala_im_prompt():
     now = datetime(2026, 9, 27, 12, tzinfo=TZ)
     assert "6 ist die beste" in harness.system_prompt(now, None, "ch")
     assert "1 ist die beste" in harness.system_prompt(now, None, "de")
+
+
+def test_bewertung_je_nach_skala():
+    from app.tools.noten import rating
+
+    assert rating(6, "ch") == "sehr gut"
+    assert rating(4, "ch") == "genügend (bestanden)"
+    assert rating(3, "ch") == "ungenügend"
+    assert rating(1, "de") == "sehr gut"
+    assert rating(6, "de") == "schlecht"
+
+
+def test_note_liefert_bewertung():
+    db = FakeDb()
+    llm = FakeLlm(calls(("note_eintragen", {"fach": "Englisch", "note": 6})), text("Stark!"))
+    run(harness.chat(db, llm, "6 in Englisch"))
+    result = db.tables["tool_log"][0]["result"]
+    assert result["bewertung"] == "sehr gut"
+
+
+def test_db_fehler_verstaendlich():
+    from fastapi.testclient import TestClient
+
+    from app.auth import get_current_user
+    from app.db import DbError
+    from app.main import app, get_db
+    from tests.fakes import FakeUser
+
+    class BrokenDb(FakeDb):
+        async def select(self, table, **params):
+            raise DbError('404: {"code":"PGRST205"}')
+
+    async def broken():
+        yield BrokenDb()
+
+    app.dependency_overrides[get_db] = broken
+    app.dependency_overrides[get_current_user] = FakeUser
+    try:
+        res = TestClient(app).get("/pending", headers={"Origin": "http://localhost:3000"})
+    finally:
+        app.dependency_overrides.clear()
+    assert res.status_code == 500
+    assert "SQL" in res.json()["detail"]
+    assert res.headers["access-control-allow-origin"] == "http://localhost:3000"
