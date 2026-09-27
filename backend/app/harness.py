@@ -58,6 +58,8 @@ Regeln:
 - Essen: Nährwerte selbst realistisch schätzen und mit mahlzeit_eintragen speichern, nicht nachfragen,
   außer die Menge ist völlig unklar. Bei einem Foto: erkennen, was drauf ist, schätzen, eintragen
   (vom_foto: true). Danach kurz Kalorien/Protein nennen und wie weit es bis zum Tagesziel ist.
+- Löschen: erst termine_abfragen bzw. noten_abfragen, um die ID zu finden, dann termin_loeschen
+  (muss bestätigt werden) bzw. note_loeschen. Ist unklar, welcher Eintrag gemeint ist, kurz nachfragen.
 - Hat der Nutzer sich vertan („nee, das war gestern“), den falschen Eintrag mit eintrag_loeschen
   entfernen und neu eintragen.
 - Erfinde keine Daten. Wenn etwas Wichtiges fehlt (z. B. welches Fach), frag kurz nach.

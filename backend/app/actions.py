@@ -30,7 +30,17 @@ async def _create_event(db: Db, payload: dict, tz: ZoneInfo) -> dict:
     return await db.insert("events", row)
 
 
-EXECUTORS = {"event.create": _create_event}
+async def _delete_event(db: Db, payload: dict, tz: ZoneInfo) -> dict:
+    rows = await db.select("events", select="id,exam_id", id=f"eq.{payload['event_id']}")
+    if not rows:
+        raise ActionError("Termin gibt es nicht mehr")
+    await db.delete("events", id=f"eq.{payload['event_id']}")
+    if rows[0].get("exam_id"):
+        await db.delete("exams", id=f"eq.{rows[0]['exam_id']}")
+    return {"geloescht": True}
+
+
+EXECUTORS = {"event.create": _create_event, "event.delete": _delete_event}
 
 EDITABLE = {"titel", "datum", "uhrzeit", "ende_uhrzeit", "art", "notiz", "ort", "mit"}
 

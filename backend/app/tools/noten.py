@@ -84,7 +84,7 @@ async def note_eintragen(ctx: ToolContext, args: dict) -> dict:
 async def noten_abfragen(ctx: ToolContext, args: dict) -> dict:
     filters = {"name": f"ilike.{args['fach'].strip()}"} if args.get("fach") else {}
     subjects = await ctx.db.select(
-        "subjects", select="name,grades(value,weight,kind,date)", **filters
+        "subjects", select="name,grades(id,value,weight,kind,date,note)", **filters
     )
     return {
         "faecher": [
@@ -137,3 +137,17 @@ async def test_anlegen(ctx: ToolContext, args: dict) -> dict:
         payload["notiz"] = args["themen"]
     result = await propose(ctx, "event.create", payload, describe(payload))
     return {"test_gespeichert": True, **result}
+
+
+@tool(
+    "note_loeschen",
+    "Löscht eine Note (z. B. falsch eingetragen). Die ID vorher mit noten_abfragen herausfinden. "
+    "Bei mehreren passenden Noten nachfragen, welche gemeint ist.",
+    obj({"id": {"type": "string", "description": "ID der Note aus noten_abfragen"}}, ["id"]),
+)
+async def note_loeschen(ctx: ToolContext, args: dict) -> dict:
+    rows = await ctx.db.select("grades", id=f"eq.{args['id']}")
+    if not rows:
+        raise ValueError("Note nicht gefunden – erst noten_abfragen aufrufen")
+    await ctx.db.delete("grades", id=f"eq.{args['id']}")
+    return {"geloescht": True, "note": rows[0]["value"]}

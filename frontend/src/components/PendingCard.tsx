@@ -37,11 +37,16 @@ export function PendingCard({ action, onDone }: Props) {
   }
 
   const p = draft;
+  const isDelete = action.kind === "event.delete";
   const field = "rounded-lg border border-border bg-background px-3 py-2 text-sm";
 
   return (
-    <div className="rounded-2xl border border-accent/40 bg-surface p-4">
-      <div className="text-xs font-medium text-muted">Soll ich das eintragen?</div>
+    <div
+      className={`rounded-2xl border bg-surface p-4 ${isDelete ? "border-red-500/50" : "border-accent/40"}`}
+    >
+      <div className="text-xs font-medium text-muted">
+        {isDelete ? "Soll ich diesen Termin löschen?" : "Soll ich das eintragen?"}
+      </div>
 
       {editing ? (
         <div className="mt-2 grid gap-2">
@@ -92,7 +97,7 @@ export function PendingCard({ action, onDone }: Props) {
         </div>
       ) : (
         <div className="mt-1">
-          <div className="font-bold">
+          <div className={`font-bold ${isDelete ? "line-through decoration-red-500" : ""}`}>
             {KIND_ICON[p.art ?? "termin"]} {p.titel}
           </div>
           <div className="text-sm text-muted">{formatWhen(p)}</div>
@@ -108,23 +113,27 @@ export function PendingCard({ action, onDone }: Props) {
         <button
           disabled={busy}
           onClick={() => decide(true)}
-          className="rounded-lg bg-accent px-3 py-1.5 text-accent-fg disabled:opacity-60"
+          className={`rounded-lg px-3 py-1.5 disabled:opacity-60 ${
+            isDelete ? "bg-red-500 text-white" : "bg-accent text-accent-fg"
+          }`}
         >
-          ✓ Eintragen
+          {isDelete ? "🗑 Löschen" : "✓ Eintragen"}
         </button>
-        <button
-          disabled={busy}
-          onClick={() => setEditing(!editing)}
-          className="rounded-lg border border-border px-3 py-1.5 hover:bg-surface-2"
-        >
-          ✎ {editing ? "Fertig" : "Ändern"}
-        </button>
+        {!isDelete && (
+          <button
+            disabled={busy}
+            onClick={() => setEditing(!editing)}
+            className="rounded-lg border border-border px-3 py-1.5 hover:bg-surface-2"
+          >
+            ✎ {editing ? "Fertig" : "Ändern"}
+          </button>
+        )}
         <button
           disabled={busy}
           onClick={() => decide(false)}
           className="rounded-lg border border-border px-3 py-1.5 text-muted hover:bg-surface-2"
         >
-          ✕ Nein
+          ✕ {isDelete ? "Behalten" : "Nein"}
         </button>
       </div>
       {error && <p className="mt-2 text-sm text-red-500">{error}</p>}

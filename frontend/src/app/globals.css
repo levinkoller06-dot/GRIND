@@ -40,4 +40,18 @@
 body {
   background: var(--background);
   color: var(--foreground);
+  /* In der App soll man nichts markieren können … */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* … außer in Eingabefeldern und Chat-Nachrichten (Klasse .selectable) */
+input,
+textarea,
+select,
+.selectable {
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-touch-callout: default;
 }

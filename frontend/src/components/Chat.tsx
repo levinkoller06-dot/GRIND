@@ -102,7 +102,7 @@ export function Chat() {
         {messages.map((m, i) => (
           <div
             key={m.id ?? `local-${i}`}
-            className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm ${
+            className={`selectable max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm ${
               m.role === "user"
                 ? "self-end rounded-br-sm bg-accent text-accent-fg"
                 : "self-start rounded-bl-sm bg-surface-2"

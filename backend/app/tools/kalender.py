@@ -76,7 +76,7 @@ async def termine_abfragen(ctx: ToolContext, args: dict) -> dict:
     end = date.fromisoformat(args.get("bis") or (today + timedelta(days=14)).isoformat())
     rows = await ctx.db.select(
         "events",
-        select="title,starts_at,ends_at,all_day,kind,location,participants",
+        select="id,title,starts_at,ends_at,all_day,kind,location,participants",
         order="starts_at",
         **{
             "starts_at": f"gte.{datetime.combine(start, time.min, ctx.tz).isoformat()}",
@@ -84,3 +84,28 @@ async def termine_abfragen(ctx: ToolContext, args: dict) -> dict:
         },
     )
     return {"termine": rows}
+
+
+@tool(
+    "termin_loeschen",
+    "Schlägt vor, einen Termin zu löschen (der Nutzer muss bestätigen). Die ID vorher mit "
+    "termine_abfragen herausfinden. Gehört der Termin zu einem Test, wird der Test mitgelöscht.",
+    obj({"id": {"type": "string", "description": "ID aus termine_abfragen"}}, ["id"]),
+)
+async def termin_loeschen(ctx: ToolContext, args: dict) -> dict:
+    rows = await ctx.db.select("events", id=f"eq.{args['id']}")
+    if not rows:
+        raise ValueError("Termin nicht gefunden – erst termine_abfragen aufrufen")
+    event = rows[0]
+    start = datetime.fromisoformat(event["starts_at"]).astimezone(ctx.tz)
+    payload = {
+        "event_id": event["id"],
+        "titel": event["title"],
+        "datum": start.date().isoformat(),
+        "art": event.get("kind") or "termin",
+    }
+    if not event.get("all_day"):
+        payload["uhrzeit"] = start.strftime("%H:%M")
+    if event.get("location"):
+        payload["ort"] = event["location"]
+    return await propose(ctx, "event.delete", payload, f"Löschen von {describe(payload)}")

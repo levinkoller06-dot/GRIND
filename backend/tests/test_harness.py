@@ -187,3 +187,39 @@ def test_db_fehler_verstaendlich():
     assert res.status_code == 500
     assert "SQL" in res.json()["detail"]
     assert res.headers["access-control-allow-origin"] == "http://localhost:3000"
+
+
+def test_termin_loeschen_nur_mit_bestaetigung():
+    db = FakeDb()
+    db.tables["exams"] = [{"id": "ex-1"}]
+    db.tables["events"] = [
+        {
+            "id": "ev-1",
+            "title": "Mathe-Test",
+            "starts_at": "2026-10-01T00:00:00+02:00",
+            "all_day": True,
+            "kind": "test",
+            "exam_id": "ex-1",
+        }
+    ]
+    llm = FakeLlm(calls(("termin_loeschen", {"id": "ev-1"})), text("Zum Löschen hingelegt."))
+    pending = run(harness.chat(db, llm, "Lösch den Mathetest"))["pending"][0]
+
+    assert pending["kind"] == "event.delete"
+    assert pending["payload"]["datum"] == "2026-10-01"
+    assert len(db.tables["events"]) == 1  # noch nicht gelöscht
+
+    run(actions.decide(db, pending["id"], True, {}, TZ))
+    assert db.tables["events"] == []
+    assert db.tables["exams"] == []
+
+
+def test_note_loeschen():
+    db = FakeDb()
+    llm = FakeLlm(calls(("note_eintragen", {"fach": "Mathe", "note": 4})), text("ok"))
+    run(harness.chat(db, llm, "4 in Mathe"))
+    grade_id = db.tables["grades"][0]["id"]
+
+    llm = FakeLlm(calls(("note_loeschen", {"id": grade_id})), text("Gelöscht."))
+    run(harness.chat(db, llm, "Lösch die 4 in Mathe"))
+    assert db.tables["grades"] == []
