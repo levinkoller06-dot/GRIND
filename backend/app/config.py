@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     supabase_jwt_secret: str = ""
 
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-3.8-flash"
-    gemini_fallback_model: str = "gemini-3.5-flash-lite"
+    # Reihenfolge der Modelle: ist eines aufgebraucht/zu langsam, kommt das nächste dran
+    gemini_models: str = "gemini-3.8-flash,gemini-3.7-flash,gemini-3.5-flash-lite"
 
     # Schlüssel zum Verschlüsseln von Mail-Passwörtern (Fernet)
     encryption_key: str = ""

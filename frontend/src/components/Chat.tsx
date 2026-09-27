@@ -35,6 +35,8 @@ export function Chat() {
   const [image, setImage] = useState<ChatImage | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  // Sofort wirksame Sperre (useState wäre bei schnellem Doppel-Enter zu spät)
+  const sending = useRef(false);
 
   async function pickImage(file: File | undefined) {
     if (!file) return;
@@ -61,7 +63,8 @@ export function Chat() {
   async function send(text: string) {
     const photo = image;
     const message = text.trim() || (photo ? "Was hab ich hier gegessen? Trag es ein." : "");
-    if (!message || busy) return;
+    if (!message || sending.current) return;
+    sending.current = true;
     setInput("");
     setImage(null);
     setError(null);
@@ -81,6 +84,7 @@ export function Chat() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Fehler");
     } finally {
+      sending.current = false;
       setBusy(false);
     }
   }

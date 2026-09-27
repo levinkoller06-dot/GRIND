@@ -1,3 +1,5 @@
+import asyncio
+import logging
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
@@ -13,6 +15,8 @@ from app.db import Db, DbError
 from app.llm import Gemini, LlmError
 from app.mail import service as mail_service
 from app.mail.imap import PRESETS, MailError
+
+log = logging.getLogger(__name__)
 
 app = FastAPI(title="GRIND Backend")
 
@@ -55,7 +59,7 @@ DbDep = Annotated[Db, Depends(get_db)]
 def get_llm(settings: SettingsDep) -> Gemini:
     if not settings.gemini_api_key:
         raise HTTPException(503, "GEMINI_API_KEY fehlt in backend/.env")
-    return Gemini(settings.gemini_api_key, settings.gemini_model, settings.gemini_fallback_model)
+    return Gemini(settings.gemini_api_key, [m.strip() for m in settings.gemini_models.split(",")])
 
 
 async def user_tz(db: Db) -> ZoneInfo:
@@ -84,15 +88,25 @@ class ChatIn(BaseModel):
     image: ImageIn | None = None
 
 
+_chat_locks: dict[str, asyncio.Lock] = {}
+
+
 @app.post("/chat")
 async def chat(body: ChatIn, db: DbDep, llm: Annotated[Gemini, Depends(get_llm)]) -> dict:
-    try:
-        image = body.image.model_dump() if body.image else None
-        return await harness.chat(db, llm, body.message.strip(), image)
-    except harness.LimitReached as e:
-        raise HTTPException(429, str(e)) from e
-    except LlmError as e:
-        raise HTTPException(502, f"KI nicht erreichbar: {e}") from e
+    lock = _chat_locks.setdefault(db.user.id, asyncio.Lock())
+    async with lock:
+        try:
+            image = body.image.model_dump() if body.image else None
+            return await harness.chat(db, llm, body.message.strip(), image)
+        except harness.LimitReached as e:
+            raise HTTPException(429, str(e)) from e
+        except LlmError as e:
+            raise HTTPException(502, str(e)) from e
+        except (DbError, MailError):
+            raise
+        except Exception as e:  # sauber melden statt "Backend nicht erreichbar"
+            log.exception("Chat fehlgeschlagen")
+            raise HTTPException(500, f"Interner Fehler: {e}") from e
 
 
 @app.get("/chat/history")
@@ -112,7 +126,7 @@ async def nutrition_suggestions(db: DbDep, llm: Annotated[Gemini, Depends(get_ll
     try:
         return await suggestions.suggestions(db, llm, await user_tz(db))
     except LlmError as e:
-        raise HTTPException(502, f"KI nicht erreichbar: {e}") from e
+        raise HTTPException(502, str(e)) from e
 
 
 class MailAccountIn(BaseModel):

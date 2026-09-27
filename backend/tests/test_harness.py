@@ -223,3 +223,51 @@ def test_note_loeschen():
     llm = FakeLlm(calls(("note_loeschen", {"id": grade_id})), text("Gelöscht."))
     run(harness.chat(db, llm, "Lösch die 4 in Mathe"))
     assert db.tables["grades"] == []
+
+
+def test_modell_kette_bei_aufgebrauchtem_kontingent(monkeypatch):
+    import httpx
+
+    from app import llm as llm_module
+
+    calls_made = []
+
+    async def fake_post(self, url, json=None, headers=None):
+        model = url.split("/models/")[1].split(":")[0]
+        calls_made.append(model)
+        request = httpx.Request("POST", url)
+        if model == "a":
+            return httpx.Response(
+                429, text='{"quotaId": "RequestsPerDayPerProject"}', request=request
+            )
+        return httpx.Response(
+            200,
+            json={"candidates": [{"content": {"role": "model", "parts": [{"text": "hi"}]}}]},
+            request=request,
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+    llm_module._exhausted.clear()
+    gemini = llm_module.Gemini("key", ["a", "b"])
+
+    assert run(gemini.generate("s", [], []))["parts"][0]["text"] == "hi"
+    assert calls_made == ["a", "b"]
+    # "a" ist jetzt für heute gesperrt und wird übersprungen
+    run(gemini.generate("s", [], []))
+    assert calls_made == ["a", "b", "b"]
+    llm_module._exhausted.clear()
+
+
+def test_alle_modelle_aufgebraucht(monkeypatch):
+    import httpx
+
+    from app import llm as llm_module
+
+    async def fake_post(self, url, json=None, headers=None):
+        return httpx.Response(429, text="PerDay", request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+    llm_module._exhausted.clear()
+    with pytest.raises(llm_module.LlmError, match="aufgebraucht"):
+        run(llm_module.Gemini("key", ["a", "b"]).generate("s", [], []))
+    llm_module._exhausted.clear()
