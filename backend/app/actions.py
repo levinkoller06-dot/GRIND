@@ -49,10 +49,18 @@ async def _send_mail(db: Db, payload: dict, tz: ZoneInfo) -> dict:
         raise ActionError(str(e)) from e
 
 
+async def _trash_mails(db: Db, payload: dict, tz: ZoneInfo) -> dict:
+    try:
+        return await mail_service.trash(db, payload["ids"])
+    except MailError as e:
+        raise ActionError(str(e)) from e
+
+
 EXECUTORS = {
     "event.create": _create_event,
     "event.delete": _delete_event,
     "mail.send": _send_mail,
+    "mail.delete": _trash_mails,
 }
 
 EDITABLE = {

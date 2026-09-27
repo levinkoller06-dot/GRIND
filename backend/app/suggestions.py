@@ -31,9 +31,16 @@ SCHEMA = {
 }
 
 SYSTEM = """Du bist Ernährungs-Coach in der App GRIND (Schüler, macht Krafttraining).
-Plane die restlichen Mahlzeiten/Snacks des Tages, damit die Tagesziele möglichst genau erreicht
-werden. Einfache, alltagstaugliche Sachen (Apfel, Proteinshake, Quark, Brot mit Käse, Nudeln …).
-Nur Uhrzeiten nach der aktuellen Uhrzeit, höchstens 4 Vorschläge, letzte spätestens 21:30.
+Plane grob, was er heute noch essen sollte, damit er seine Tagesziele ungefähr erreicht.
+
+Wichtig: KEINE Rezepte und keine speziellen Zutaten (kein "Putenbrust mit Quinoa", kein ganzes Huhn).
+Nur Sachen, die man fast immer zuhause hat oder im Laden um die Ecke bekommt, in Alltagsmengen:
+Apfel, Banane, Joghurt, Quark, Milch, Müsli, Brot mit Käse/Schinken, Eier, Nüsse, Proteinshake,
+Proteinriegel, eine normale Portion vom Abendessen.
+Gerne als Auswahl formulieren: „Joghurt oder Quark“, „2 Eier oder Käsebrot“.
+
+Nur Uhrzeiten nach der aktuellen Uhrzeit, höchstens 4 Vorschläge, letzter spätestens 21:30.
+Das Abendessen nicht als Rezept planen, sondern z. B. als „normale Portion Abendessen + Glas Milch“.
 Sind die Ziele schon erreicht: keine oder nur leichte Vorschläge und das im Hinweis sagen.
 Deutsch, kurz."""
 
@@ -41,7 +48,9 @@ Deutsch, kurz."""
 _cache: dict[str, tuple[tuple, dict]] = {}
 
 
-async def suggestions(db: Db, llm: Gemini, tz: ZoneInfo) -> dict:
+async def suggestions(db: Db, llm: Gemini, tz: ZoneInfo, force: bool = False) -> dict:
+    """Neu berechnet wird nur, wenn sich das Gegessene oder die Ziele geändert haben
+    (oder `force`, z. B. über den Knopf „Andere Vorschläge“)."""
     now = datetime.now(tz)
     today = now.date()
     start = datetime.combine(today, time.min, tz)
@@ -65,13 +74,13 @@ async def suggestions(db: Db, llm: Gemini, tz: ZoneInfo) -> dict:
     key = (
         db.user.id,
         today,
+        len(meals),
         round(eaten["kcal"]),
-        now.hour,
         goals.get("goal_kcal"),
         goals.get("goal_protein_g"),
     )
     cached = _cache.get(db.user.id)
-    if cached and cached[0] == key:
+    if cached and cached[0] == key and not force:
         return cached[1]
 
     if not goals.get("goal_kcal") and not goals.get("goal_protein_g"):

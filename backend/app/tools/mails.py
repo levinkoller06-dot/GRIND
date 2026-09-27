@@ -6,10 +6,12 @@ from app.tools.base import ToolContext, obj, propose, tool
 @tool(
     "mails_abfragen",
     "Durchsucht das gemeinsame Postfach (alle Mail-Konten des Nutzers). Liefert Absender, "
-    "Betreff, Datum, Vorschau und die ID jeder Mail.",
+    "Betreff, Datum, Vorschau, ID und ob es ein Newsletter/Werbung ist (newsletter=true). "
+    "Für Aufräumen/Löschen vieler Mails kompakt=true setzen (mehr Mails, ohne Vorschau).",
     obj(
         {
             "tage": {"type": "integer", "description": "Wie viele Tage zurück, Standard 7"},
+            "kompakt": {"type": "boolean", "description": "Bis zu 150 Mails ohne Vorschau"},
             "suche": {
                 "type": "string",
                 "description": "Wort im Absender/Betreff/Text, z. B. 'Tim'",
@@ -23,18 +25,64 @@ from app.tools.base import ToolContext, obj, propose, tool
     ),
 )
 async def mails_abfragen(ctx: ToolContext, args: dict) -> dict:
+    compact = bool(args.get("kompakt"))
     result = await service.inbox(
         ctx.db,
         days=min(int(args.get("tage") or 7), 60),
-        limit=40,
+        limit=150 if compact else 40,
         unseen_only=bool(args.get("nur_ungelesen")),
         search=args.get("suche"),
         konto=args.get("konto"),
     )
     if not result["konten"]:
         return {"hinweis": "Noch kein Mail-Konto verbunden (Einstellungen → Mail-Konten)."}
-    result["mails"] = result["mails"][:25]
+    if compact:
+        result["mails"] = [
+            {
+                "id": m["id"],
+                "von": f"{m['von']['name']} <{m['von']['email']}>",
+                "betreff": m["betreff"],
+                "newsletter": m["newsletter"],
+            }
+            for m in result["mails"][:150]
+        ]
+    else:
+        result["mails"] = result["mails"][:25]
     return result
+
+
+@tool(
+    "mails_loeschen",
+    "Schlägt vor, Mails in den Papierkorb zu verschieben (z. B. Werbung, Spam, alle von einem "
+    "Absender). Der Nutzer muss bestätigen. IDs vorher mit mails_abfragen (kompakt) holen.",
+    obj(
+        {
+            "ids": {"type": "array", "items": {"type": "string"}},
+            "grund": {
+                "type": "string",
+                "description": "Kurz, z. B. 'Werbung' oder 'alle von Google'",
+            },
+        },
+        ["ids"],
+    ),
+)
+async def mails_loeschen(ctx: ToolContext, args: dict) -> dict:
+    ids = list(dict.fromkeys(args["ids"]))
+    if not ids:
+        raise ValueError("Keine Mails angegeben")
+    # Absender/Betreff für die Bestätigungs-Karte aus dem Zwischenspeicher holen
+    known = {m["id"]: m for _, mails in service._cache.values() for m in mails}
+    preview = [
+        {
+            "von": known[i]["von"]["name"] if i in known else "?",
+            "betreff": known[i]["betreff"] if i in known else i,
+        }
+        for i in ids
+    ]
+    payload = {"ids": ids, "anzahl": len(ids), "grund": args.get("grund"), "vorschau": preview}
+    return await propose(
+        ctx, "mail.delete", payload, f"{len(ids)} Mail(s) in den Papierkorb verschieben."
+    )
 
 
 @tool(

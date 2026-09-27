@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     gemini_api_key: str = ""
     # Reihenfolge der Modelle: ist eines aufgebraucht/zu langsam, kommt das nächste dran
-    gemini_models: str = "gemini-3.8-flash,gemini-3.7-flash,gemini-3.5-flash-lite"
+    gemini_models: str = "gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.8-flash"
 
     # Schlüssel zum Verschlüsseln von Mail-Passwörtern (Fernet)
     encryption_key: str = ""

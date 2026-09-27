@@ -148,6 +148,9 @@ def _summary(
         "betreff": _header(msg, "Subject") or "(kein Betreff)",
         "datum": _date(msg),
         "gelesen": b"\\Seen" in flags,
+        # Newsletter/Werbung erkennt man meist am Abmelde-Header
+        "newsletter": bool(_header(msg, "List-Unsubscribe"))
+        or _header(msg, "Precedence").lower() in ("bulk", "list"),
         "vorschau": " ".join(text.split())[:200],
     }
 
@@ -170,11 +173,22 @@ def _fetch(conn: imaplib.IMAP4_SSL, uids: list[bytes], what: str) -> dict[str, t
 
 
 def list_messages(
-    acc: ImapAccount, days: int = 7, limit: int = 30, unseen_only: bool = False
-) -> list[dict]:
-    """Neueste Mails aus dem Posteingang (ohne sie als gelesen zu markieren)."""
+    acc: ImapAccount,
+    days: int = 7,
+    limit: int = 30,
+    unseen_only: bool = False,
+    known_fingerprint: str | None = None,
+) -> tuple[str, list[dict] | None]:
+    """Neueste Mails aus dem Posteingang (ohne sie als gelesen zu markieren).
+
+    Gibt (Fingerabdruck, Mails) zurück. Hat sich seit `known_fingerprint` nichts geändert,
+    ist die Liste None – dann reicht der zwischengespeicherte Stand.
+    """
     conn = _connect(acc)
     try:
+        fp = fingerprint(conn)
+        if known_fingerprint == fp:
+            return fp, None
         conn.select("INBOX", readonly=True)
         since = (datetime.now(UTC) - timedelta(days=days)).strftime("%d-%b-%Y")
         criteria = ["SINCE", since] + (["UNSEEN"] if unseen_only else [])
@@ -183,7 +197,7 @@ def list_messages(
             raise MailError(f"Suche fehlgeschlagen: {data}")
         uids = data[0].split()[-limit:]
         if not uids:
-            return []
+            return fp, []
         heads = _fetch(conn, uids, "(FLAGS RFC822.SIZE BODY.PEEK[HEADER])")
 
         def size(meta: bytes) -> int:
@@ -198,7 +212,7 @@ def list_messages(
             flags = re.search(rb"FLAGS \(([^)]*)\)", meta)
             raw = full[uid][1] if uid in full else header
             result.append(_summary(acc, uid, flags.group(1) if flags else b"", raw, uid in full))
-        return result
+        return fp, result
     finally:
         conn.logout()
 
@@ -224,15 +238,68 @@ def get_message(acc: ImapAccount, uid: str) -> dict:
         conn.logout()
 
 
-def _sent_folder(conn: imaplib.IMAP4_SSL) -> str | None:
+LIST_LINE = re.compile(r'\((?P<flags>[^)]*)\) (?:"[^"]*"|NIL) (?P<name>.+)$')
+
+# Ordnernamen, falls der Server keine Sonder-Markierung (\Sent, \Trash) mitliefert
+FOLDER_NAMES = {
+    "\\Sent": ("sent", "gesendet", "sent items", "sent messages", "gesendete objekte"),
+    "\\Trash": ("trash", "papierkorb", "deleted items", "deleted messages", "gelöschte objekte"),
+}
+
+
+def _special_folder(conn: imaplib.IMAP4_SSL, flag: str) -> str | None:
+    """Findet z. B. den Gesendet- oder Papierkorb-Ordner (Name so, wie IMAP ihn erwartet)."""
     typ, folders = conn.list()
     if typ != "OK":
         return None
+    parsed = []
     for line in folders:
         text = line.decode(errors="replace") if isinstance(line, bytes) else str(line)
-        if "\\Sent" in text:
-            return text.rsplit(' "/" ', 1)[-1].rsplit(' "." ', 1)[-1].strip()
+        m = LIST_LINE.match(text)
+        if m:
+            parsed.append((m.group("flags"), m.group("name").strip()))
+    for flags, name in parsed:
+        if flag in flags:
+            return name
+    for _, name in parsed:
+        plain = name.strip('"').split("/")[-1].split(".")[-1].lower()
+        if plain in FOLDER_NAMES[flag]:
+            return name
     return None
+
+
+def _sent_folder(conn: imaplib.IMAP4_SSL) -> str | None:
+    return _special_folder(conn, "\\Sent")
+
+
+def fingerprint(conn: imaplib.IMAP4_SSL) -> str:
+    """Kurzer Zustand des Posteingangs: ändert sich bei neuen, gelöschten oder gelesenen Mails."""
+    typ, data = conn.status("INBOX", "(MESSAGES UIDNEXT UIDVALIDITY UNSEEN)")
+    return data[0].decode(errors="replace") if typ == "OK" and data else str(time.time())
+
+
+def move_to_trash(acc: ImapAccount, uids: list[str]) -> int:
+    """Verschiebt Mails in den Papierkorb (nicht endgültig gelöscht)."""
+    if not uids:
+        return 0
+    conn = _connect(acc)
+    try:
+        conn.select("INBOX")
+        trash = _special_folder(conn, "\\Trash")
+        if not trash:
+            raise MailError(f"Kein Papierkorb-Ordner bei {acc.email} gefunden")
+        uid_set = ",".join(uids)
+        typ, _ = conn.uid("MOVE", uid_set, trash) if "MOVE" in conn.capabilities else ("NO", None)
+        if typ != "OK":
+            # Server ohne MOVE: kopieren, markieren, aufräumen
+            typ, data = conn.uid("COPY", uid_set, trash)
+            if typ != "OK":
+                raise MailError(f"Verschieben in den Papierkorb fehlgeschlagen: {data}")
+            conn.uid("STORE", uid_set, "+FLAGS.SILENT", "(\\Deleted)")
+            conn.expunge()
+        return len(uids)
+    finally:
+        conn.logout()
 
 
 def send_message(

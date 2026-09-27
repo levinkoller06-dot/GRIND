@@ -46,7 +46,8 @@ export default async function ErnaehrungPage() {
   ]);
 
   const meals = (mealData ?? []) as Meal[];
-  const todaySum = sum(meals.filter((m) => dayKey(m.eaten_at) === today).flatMap((m) => m.meal_items));
+  const todayMeals = meals.filter((m) => dayKey(m.eaten_at) === today);
+  const todaySum = sum(todayMeals.flatMap((m) => m.meal_items));
   const goalKcal = profile?.goal_kcal ?? null;
   const goalProtein = profile?.goal_protein_g ?? null;
 
@@ -100,7 +101,9 @@ export default async function ErnaehrungPage() {
           </section>
         </div>
 
-        <MealSuggestions />
+        <MealSuggestions
+          fingerprint={[today, todayMeals.length, Math.round(todaySum.kcal), goalKcal, goalProtein].join("|")}
+        />
       </div>
     </div>
   );

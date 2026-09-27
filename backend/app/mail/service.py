@@ -6,6 +6,9 @@ from app.db import Db
 from app.mail import imap
 from app.mail.crypto import decrypt, encrypt
 
+# Zwischenspeicher pro Konto: (Konto, Tage, Limit, nur ungelesen) → (Fingerabdruck, Mails)
+_cache: dict[tuple, tuple[str, list[dict]]] = {}
+
 PUBLIC_FIELDS = "id,provider,email,label,color,imap_host,imap_port,smtp_host,smtp_port,created_at"
 
 
@@ -83,12 +86,25 @@ async def inbox(
     search: str | None = None,
     konto: str | None = None,
 ) -> dict:
-    """Mails aller Konten, neueste zuerst. Fehler einzelner Konten werden mitgeliefert."""
+    """Mails aller Konten, neueste zuerst. Fehler einzelner Konten werden mitgeliefert.
+
+    Pro Konto wird nur neu geladen, wenn sich der Posteingang seit dem letzten Abruf
+    geändert hat (neue, gelöschte oder gelesene Mails).
+    """
     accounts = await _accounts(db, konto)
-    results = await asyncio.gather(
-        *(asyncio.to_thread(imap.list_messages, a, days, limit, unseen_only) for a in accounts),
-        return_exceptions=True,
-    )
+
+    async def load(a: imap.ImapAccount) -> list[dict]:
+        key = (a.id, days, limit, unseen_only)
+        cached = _cache.get(key)
+        fp, mails = await asyncio.to_thread(
+            imap.list_messages, a, days, limit, unseen_only, cached[0] if cached else None
+        )
+        if mails is None and cached:
+            return cached[1]
+        _cache[key] = (fp, mails or [])
+        return mails or []
+
+    results = await asyncio.gather(*(load(a) for a in accounts), return_exceptions=True)
     mails, errors = [], []
     for account, result in zip(accounts, results, strict=True):
         if isinstance(result, Exception):
@@ -124,6 +140,19 @@ async def _account_by_id(db: Db, account_id: str) -> imap.ImapAccount:
 async def read(db: Db, mail_id: str) -> dict:
     account_id, uid = _split_id(mail_id)
     return await asyncio.to_thread(imap.get_message, await _account_by_id(db, account_id), uid)
+
+
+async def trash(db: Db, mail_ids: list[str]) -> dict:
+    """Verschiebt Mails (auch aus mehreren Konten) in den jeweiligen Papierkorb."""
+    by_account: dict[str, list[str]] = {}
+    for mail_id in mail_ids:
+        account_id, uid = _split_id(mail_id)
+        by_account.setdefault(account_id, []).append(uid)
+    moved = 0
+    for account_id, uids in by_account.items():
+        account = await _account_by_id(db, account_id)
+        moved += await asyncio.to_thread(imap.move_to_trash, account, uids)
+    return {"in_papierkorb": moved}
 
 
 async def send(db: Db, payload: dict) -> dict:

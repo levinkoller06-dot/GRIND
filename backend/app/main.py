@@ -122,9 +122,11 @@ async def chat_history(db: DbDep) -> list[dict]:
 
 
 @app.get("/nutrition/suggestions")
-async def nutrition_suggestions(db: DbDep, llm: Annotated[Gemini, Depends(get_llm)]) -> dict:
+async def nutrition_suggestions(
+    db: DbDep, llm: Annotated[Gemini, Depends(get_llm)], force: bool = False
+) -> dict:
     try:
-        return await suggestions.suggestions(db, llm, await user_tz(db))
+        return await suggestions.suggestions(db, llm, await user_tz(db), force)
     except LlmError as e:
         raise HTTPException(502, str(e)) from e
 
@@ -170,6 +172,12 @@ async def mail_inbox(db: DbDep, days: int = 7) -> dict:
 @app.get("/mail/message/{mail_id}")
 async def mail_message(mail_id: str, db: DbDep) -> dict:
     return await mail_service.read(db, mail_id)
+
+
+@app.delete("/mail/message/{mail_id}")
+async def trash_mail_message(mail_id: str, db: DbDep) -> dict:
+    # Direkter Klick des Nutzers im Mails-Tab = Bestätigung
+    return await mail_service.trash(db, [mail_id])
 
 
 @app.get("/pending")

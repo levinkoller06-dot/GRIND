@@ -13,6 +13,7 @@ type Mail = {
   betreff: string;
   datum: string | null;
   gelesen: boolean;
+  newsletter: boolean;
   vorschau: string;
 };
 
@@ -50,6 +51,17 @@ export function Inbox() {
       setError(e instanceof Error ? e.message : "Fehler");
     } finally {
       setLoadingId(null);
+    }
+  }
+
+  async function trash(mail: FullMail) {
+    if (!confirm(`„${mail.betreff}“ in den Papierkorb verschieben?`)) return;
+    try {
+      await api(`/mail/message/${encodeURIComponent(mail.id)}`, { method: "DELETE" });
+      setInbox((box) => box && { ...box, mails: box.mails.filter((m) => m.id !== mail.id) });
+      setOpen(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Fehler");
     }
   }
 
@@ -97,7 +109,12 @@ export function Inbox() {
                     <span className={`truncate ${m.gelesen ? "" : "font-bold"}`}>{m.von.name}</span>
                     <span className="shrink-0 text-xs text-muted">{loadingId === m.id ? "…" : when(m.datum)}</span>
                   </span>
-                  <span className={`block truncate text-sm ${m.gelesen ? "text-muted" : ""}`}>{m.betreff}</span>
+                  <span className={`block truncate text-sm ${m.gelesen ? "text-muted" : ""}`}>
+                    {m.newsletter && (
+                      <span className="mr-1 rounded bg-surface-2 px-1 text-[10px] text-muted">Newsletter</span>
+                    )}
+                    {m.betreff}
+                  </span>
                   <span className="block truncate text-xs text-muted">{m.vorschau}</span>
                 </span>
               </button>
@@ -109,7 +126,15 @@ export function Inbox() {
       <section className="flex flex-col rounded-2xl border border-border bg-surface p-4 md:min-h-0">
         {open ? (
           <>
-            <h2 className="text-lg font-bold">{open.betreff}</h2>
+            <div className="flex items-start justify-between gap-2">
+              <h2 className="text-lg font-bold">{open.betreff}</h2>
+              <button
+                onClick={() => trash(open)}
+                className="shrink-0 rounded-lg border border-border px-2.5 py-1 text-xs hover:border-red-500 hover:text-red-500"
+              >
+                🗑 Löschen
+              </button>
+            </div>
             <p className="text-sm text-muted">
               {open.von.name} &lt;{open.von.email}&gt; → {open.konto} · {when(open.datum)}
             </p>
@@ -117,7 +142,8 @@ export function Inbox() {
               {open.text || "(kein Text)"}
             </div>
             <p className="mt-3 text-xs text-muted">
-              Antworten? Sag dem Gehirn z. B. „Antworte {open.von.name.split(" ")[0]}, dass …“
+              Antworten? Sag dem Gehirn z. B. „Antworte {open.von.name.split(" ")[0]}, dass …“ · Aufräumen:
+              „Lösch alle Werbemails“
             </p>
           </>
         ) : (
