@@ -55,7 +55,7 @@ async def add_account(db: Db, data: dict) -> dict:
     account = imap.ImapAccount(
         id="neu",
         email=data["email"].strip(),
-        password=data["password"],
+        password=password,
         label=data.get("label"),
         **settings,
     )
