@@ -28,7 +28,9 @@ Beispiel:
 |---|---|
 | 📅 **Kalender** | Schule, Termine, Tests, Geburtstage |
 | 📊 **Noten & Lernen** | Fächer, Noten, Schnitt, Tests, Lernplan, Karteikarten |
-| 💪 **Gym & Essen** | Trainingsplan, Fortschritt, Rekorde, Mahlzeiten, Kalorien, Protein |
+| 💪 **Gym** | Wochen-Trainingsplan, heutiges Training |
+| 🥗 **Ernährung** | Kalorien, Protein, 7-Tage-Verlauf, KI-Vorschläge was man noch essen sollte |
+| 📁 **Projekte** | Ordner pro Projekt mit Aufgaben, Notizen, Deadlines (geplant) |
 | 📬 **Mails & Pakete** | Mail-Zusammenfassungen, Antwort-Entwürfe, Lieferstatus |
 | 🎮 **Freizeit** | Gaming-News, Free Games, Watchlist |
 | 💰 **Geld** | Taschengeld, Sparziele, Preis-Wächter |
@@ -166,6 +168,7 @@ Alle Tabellen haben `user_id` und Row Level Security.
 | **4 – Mails** | Gmail pro Nutzer: Zusammenfassung, Sortierung, Antwort-Entwürfe (mit Bestätigung) | Mail-Helfer |
 | **5 – Zeitplan & n8n** | n8n aufsetzen: Morgen-Check, Mail-Abruf, Erinnerungen | App meldet sich selbst |
 | **6 – Lernen & Extras** | Lernplan, Karteikarten, Pakete, Geld, Freizeit | Alle Tabs |
+| **6b – Projekte** | Projekte-Tab: Ordner pro Projekt mit Aufgaben, Notizen, Dateien und Deadlines; Tools `projekt_anlegen`, `aufgabe_hinzufuegen` | Schul- und Privatprojekte im Griff |
 | **7 – Online & Sprache** | Hosting, Handy-Installation, Spracheingabe | Freunde können mitmachen |
 
 ## 10. Wichtig bei mehreren Nutzern

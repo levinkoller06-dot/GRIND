@@ -28,7 +28,18 @@ GRADE_SCALES = {
 }
 
 
-def system_prompt(now: datetime, name: str | None, grade_scale: str = "ch") -> str:
+def subject_list(subjects: list[dict]) -> str:
+    if not subjects:
+        return "(noch keine)"
+    return ", ".join(
+        s["name"] + (f" (auch: {', '.join(s['aliases'])})" if s.get("aliases") else "")
+        for s in subjects
+    )
+
+
+def system_prompt(
+    now: datetime, name: str | None, grade_scale: str = "ch", subjects: list[dict] | None = None
+) -> str:
     days = "\n".join(
         f"- {WEEKDAYS[d.weekday()]}: {d.isoformat()}"
         for d in (now.date() + timedelta(days=i) for i in range(8))
@@ -42,6 +53,9 @@ Die nächsten Tage:
 „Donnerstag“ meint immer den nächsten Donnerstag ab heute (heute zählt, wenn heute Donnerstag ist und der Kontext passt).
 
 Noten: {GRADE_SCALES.get(grade_scale, GRADE_SCALES["ch"])}
+Fächer des Nutzers: {subject_list(subjects or [])}
+Ordne Noten und Tests immer einem dieser Fächer zu, auch bei Tippfehlern oder Englisch
+(z. B. „english“ → Englisch, „Gesellschaft“ → ABU). Neue Fächer nur, wenn der Nutzer das will.
 Bewerte Noten und Schnitte immer nach dieser Skala. Die Tools liefern eine „bewertung“ mit,
 die stimmt immer – richte deine Reaktion danach (bei „sehr gut“ feiern, nie trösten).
 Schreib keine Markdown-Tabellen oder Überschriften; **fett** ist ok.
@@ -60,6 +74,9 @@ Regeln:
   (vom_foto: true). Danach kurz Kalorien/Protein nennen und wie weit es bis zum Tagesziel ist.
 - Löschen: erst termine_abfragen bzw. noten_abfragen, um die ID zu finden, dann termin_loeschen
   (muss bestätigt werden) bzw. note_loeschen. Ist unklar, welcher Eintrag gemeint ist, kurz nachfragen.
+- Trainingsplan: schickt der Nutzer seinen Plan, mit trainingsplan_setzen speichern (alle Tage;
+  „-11“ hinter einer Übung = stufe „11“). Sagt er „Training von heute gemacht“, den Plan holen
+  und die Übungen des heutigen Tages mit training_speichern eintragen.
 - Hat der Nutzer sich vertan („nee, das war gestern“), den falschen Eintrag mit eintrag_loeschen
   entfernen und neu eintragen.
 - Erfinde keine Daten. Wenn etwas Wichtiges fehlt (z. B. welches Fach), frag kurz nach.
@@ -135,7 +152,10 @@ async def chat(db: Db, llm: Gemini, message: str, image: dict | None = None) -> 
 
     ctx = ToolContext(db=db, tz=tz, now=now, grade_scale=profile.get("grade_scale") or "ch")
     declarations = [t.declaration() for t in REGISTRY.values()]
-    system = system_prompt(now, profile.get("display_name"), profile.get("grade_scale") or "ch")
+    subjects = await db.select("subjects", select="name,aliases", order="name")
+    system = system_prompt(
+        now, profile.get("display_name"), profile.get("grade_scale") or "ch", subjects
+    )
     tools_used: list[str] = []
     reply = ""
 

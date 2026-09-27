@@ -4,12 +4,28 @@ from app.tools.base import ToolContext, obj, propose, tool
 from app.tools.kalender import describe
 
 
+def _norm(s: str) -> str:
+    return " ".join(s.lower().split())
+
+
+def match_subject(subjects: list[dict], name: str) -> dict | None:
+    """Findet ein Fach über den Namen oder einen Alias (Groß-/Kleinschreibung egal)."""
+    wanted = _norm(name)
+    for s in subjects:
+        if _norm(s["name"]) == wanted or wanted in (_norm(a) for a in s.get("aliases") or []):
+            return s
+    return None
+
+
+async def find_subject(ctx: ToolContext, name: str) -> dict | None:
+    return match_subject(await ctx.db.select("subjects"), name)
+
+
 async def get_or_create_subject(ctx: ToolContext, name: str) -> dict:
-    name = name.strip()
-    found = await ctx.db.select("subjects", name=f"ilike.{name}", limit="1")
+    found = await find_subject(ctx, name)
     if found:
-        return found[0]
-    return await ctx.db.insert("subjects", {"user_id": ctx.db.user.id, "name": name})
+        return found
+    return await ctx.db.insert("subjects", {"user_id": ctx.db.user.id, "name": name.strip()})
 
 
 def rating(value: float | None, scale: str) -> str | None:
@@ -37,7 +53,8 @@ def average(grades: list[dict]) -> float | None:
 
 @tool(
     "note_eintragen",
-    "Speichert eine Note in einem Fach. Das Fach wird angelegt, falls es noch nicht existiert.",
+    "Speichert eine Note in einem Fach. Nutze den exakten Namen eines bestehenden Fachs "
+    "(siehe Fächerliste). Nur wenn es das Fach wirklich nicht gibt, wird es neu angelegt.",
     obj(
         {
             "fach": {"type": "string", "description": "z. B. 'Mathe', 'Englisch'"},
@@ -82,10 +99,12 @@ async def note_eintragen(ctx: ToolContext, args: dict) -> dict:
     obj({"fach": {"type": "string", "description": "Optional, sonst alle Fächer"}}),
 )
 async def noten_abfragen(ctx: ToolContext, args: dict) -> dict:
-    filters = {"name": f"ilike.{args['fach'].strip()}"} if args.get("fach") else {}
     subjects = await ctx.db.select(
-        "subjects", select="name,grades(id,value,weight,kind,date,note)", **filters
+        "subjects", select="id,name,aliases,grades(id,value,weight,kind,date,note)"
     )
+    if args.get("fach"):
+        found = match_subject(subjects, args["fach"])
+        subjects = [found] if found else []
     return {
         "faecher": [
             {
@@ -151,3 +170,89 @@ async def note_loeschen(ctx: ToolContext, args: dict) -> dict:
         raise ValueError("Note nicht gefunden – erst noten_abfragen aufrufen")
     await ctx.db.delete("grades", id=f"eq.{args['id']}")
     return {"geloescht": True, "note": rows[0]["value"]}
+
+
+@tool(
+    "faecher_anlegen",
+    "Legt ein oder mehrere Schulfächer an (z. B. aus dem Stundenplan). Aliase sind weitere "
+    "Namen, unter denen das Fach auch gemeint sein kann.",
+    obj(
+        {
+            "faecher": {
+                "type": "array",
+                "items": obj(
+                    {
+                        "name": {"type": "string", "description": "z. B. 'ABU', 'Modul 114'"},
+                        "aliase": {"type": "array", "items": {"type": "string"}},
+                    },
+                    ["name"],
+                ),
+            }
+        },
+        ["faecher"],
+    ),
+)
+async def faecher_anlegen(ctx: ToolContext, args: dict) -> dict:
+    existing = await ctx.db.select("subjects")
+    created, skipped = [], []
+    for f in args["faecher"]:
+        if match_subject(existing, f["name"]):
+            skipped.append(f["name"])
+            continue
+        row = await ctx.db.insert(
+            "subjects",
+            {
+                "user_id": ctx.db.user.id,
+                "name": f["name"].strip(),
+                "aliases": f.get("aliase") or [],
+            },
+        )
+        existing.append(row)
+        created.append(row["name"])
+    return {"angelegt": created, "gab_es_schon": skipped}
+
+
+@tool(
+    "fach_aendern",
+    "Benennt ein Fach um und/oder setzt seine Aliase neu.",
+    obj(
+        {
+            "fach": {"type": "string", "description": "Aktueller Name oder Alias"},
+            "neuer_name": {"type": "string"},
+            "aliase": {"type": "array", "items": {"type": "string"}},
+        },
+        ["fach"],
+    ),
+)
+async def fach_aendern(ctx: ToolContext, args: dict) -> dict:
+    subject = await find_subject(ctx, args["fach"])
+    if not subject:
+        raise ValueError(f"Fach '{args['fach']}' gibt es nicht")
+    values = {}
+    if args.get("neuer_name"):
+        values["name"] = args["neuer_name"].strip()
+    if args.get("aliase") is not None:
+        values["aliases"] = args["aliase"]
+    if not values:
+        raise ValueError("Nichts zu ändern")
+    await ctx.db.update("subjects", values, id=f"eq.{subject['id']}")
+    return {"geaendert": True, **values}
+
+
+@tool(
+    "fach_loeschen",
+    "Löscht ein Fach. Geht nur, wenn es keine Noten mehr hat (sonst erst die Noten löschen).",
+    obj({"fach": {"type": "string"}}, ["fach"]),
+)
+async def fach_loeschen(ctx: ToolContext, args: dict) -> dict:
+    subject = await find_subject(ctx, args["fach"])
+    if not subject:
+        raise ValueError(f"Fach '{args['fach']}' gibt es nicht")
+    grades = await ctx.db.select("grades", select="id", subject_id=f"eq.{subject['id']}")
+    if grades:
+        raise ValueError(
+            f"{subject['name']} hat noch {len(grades)} Note(n). Frag den Nutzer, "
+            "ob die Noten wirklich gelöscht werden sollen."
+        )
+    await ctx.db.delete("subjects", id=f"eq.{subject['id']}")
+    return {"geloescht": subject["name"]}

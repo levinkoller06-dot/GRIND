@@ -151,3 +151,106 @@ async def rekorde_abfragen(ctx: ToolContext, args: dict) -> dict:
         needle = args["uebung"].strip().lower()
         best = {k: v for k, v in best.items() if needle in k}
     return {"rekorde": list(best.values())}
+
+
+WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+
+PLAN_EXERCISE = obj(
+    {
+        "uebung": {"type": "string"},
+        "saetze": {"type": "integer"},
+        "wiederholungen": {"type": "integer"},
+        "dauer": {"type": "string", "description": "z. B. '1 Minute', '20–30 Minuten'"},
+        "stufe": {
+            "type": "string",
+            "description": "Gewicht/Geräte-Stufe, z. B. bei 'Brustpresse – 3×8 -11' → '11'",
+        },
+        "hinweis": {"type": "string"},
+    },
+    ["uebung"],
+)
+
+PLAN_DAY = obj(
+    {
+        "tag": {
+            "type": "string",
+            "description": "Wochentag(e), z. B. 'Montag' oder 'Samstag oder Sonntag'",
+        },
+        "titel": {"type": "string", "description": "z. B. 'Brust & Rücken' oder 'Pause'"},
+        "pause": {"type": "boolean"},
+        "uebungen": {"type": "array", "items": PLAN_EXERCISE},
+        "hinweis": {"type": "string", "description": "z. B. 'Kompletter Ruhetag'"},
+    },
+    ["tag", "titel"],
+)
+
+
+async def _load_plan(ctx: ToolContext) -> list[dict]:
+    rows = await ctx.db.select("training_plans", user_id=f"eq.{ctx.db.user.id}")
+    return rows[0]["days"] if rows else []
+
+
+async def _save_plan(ctx: ToolContext, days: list[dict]) -> None:
+    uid = ctx.db.user.id
+    if await ctx.db.select("training_plans", select="user_id", user_id=f"eq.{uid}"):
+        await ctx.db.update(
+            "training_plans",
+            {"days": days, "updated_at": ctx.now.isoformat()},
+            user_id=f"eq.{uid}",
+        )
+    else:
+        await ctx.db.insert("training_plans", {"user_id": uid, "days": days})
+
+
+def _clean(day: dict) -> dict:
+    day = {k: v for k, v in day.items() if v not in (None, "", [])}
+    day["uebungen"] = [
+        {k: v for k, v in e.items() if v not in (None, "", 0)} for e in day.get("uebungen", [])
+    ]
+    day["pause"] = bool(day.get("pause"))
+    return day
+
+
+@tool(
+    "trainingsplan_setzen",
+    "Speichert den kompletten Wochen-Trainingsplan (ersetzt den alten). Übernimm alle Tage "
+    "in der Reihenfolge des Nutzers, auch Pausentage.",
+    obj({"tage": {"type": "array", "items": PLAN_DAY}}, ["tage"]),
+)
+async def trainingsplan_setzen(ctx: ToolContext, args: dict) -> dict:
+    days = [_clean(d) for d in args["tage"]]
+    await _save_plan(ctx, days)
+    return {
+        "gespeichert": True,
+        "tage": len(days),
+        "uebungen": sum(len(d["uebungen"]) for d in days),
+    }
+
+
+@tool(
+    "trainingsplan_tag_aendern",
+    "Ändert oder ergänzt einen einzelnen Tag im Trainingsplan (der ganze Tag wird ersetzt). "
+    "Vorher mit trainingsplan_abfragen den aktuellen Stand holen.",
+    obj({"tag": PLAN_DAY}, ["tag"]),
+)
+async def trainingsplan_tag_aendern(ctx: ToolContext, args: dict) -> dict:
+    days = await _load_plan(ctx)
+    new = _clean(args["tag"])
+    for i, d in enumerate(days):
+        if d["tag"].strip().lower() == new["tag"].strip().lower():
+            days[i] = new
+            break
+    else:
+        days.append(new)
+    await _save_plan(ctx, days)
+    return {"gespeichert": True, "tag": new["tag"]}
+
+
+@tool(
+    "trainingsplan_abfragen",
+    "Gibt den Wochen-Trainingsplan zurück (z. B. um zu wissen, was heute dran ist, oder um "
+    "ein erledigtes Plan-Training mit training_speichern einzutragen).",
+    obj({}),
+)
+async def trainingsplan_abfragen(ctx: ToolContext, args: dict) -> dict:
+    return {"heute": WEEKDAYS[ctx.now.weekday()], "tage": await _load_plan(ctx)}

@@ -5,11 +5,15 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 export default function AppLayout({ children }: LayoutProps<"/">) {
   if (!isSupabaseConfigured) return <SetupNotice />;
 
+  // Am PC füllt jede Seite genau den Bildschirm (kein Scrollen der ganzen Seite),
+  // am Handy wird normal gescrollt.
   return (
-    <div className="flex min-h-dvh">
+    <div className="flex min-h-dvh md:h-dvh md:overflow-hidden">
       <Sidebar />
-      <main className="flex-1 px-4 pt-6 pb-24 md:px-10 md:pb-10">
-        <div className="mx-auto max-w-3xl">{children}</div>
+      <main className="flex min-w-0 flex-1 flex-col px-4 pt-5 pb-24 md:px-8 md:py-6">
+        <div className="mx-auto flex w-full max-w-[90rem] flex-1 flex-col md:min-h-0">
+          {children}
+        </div>
       </main>
       <BottomBar />
     </div>

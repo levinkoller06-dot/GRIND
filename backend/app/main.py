@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from app import actions, harness
+from app import actions, harness, suggestions
 from app.auth import UserDep
 from app.config import Settings, get_settings
 from app.db import Db, DbError
@@ -98,6 +98,14 @@ async def chat_history(db: DbDep) -> list[dict]:
         limit="50",
     )
     return list(reversed(rows))
+
+
+@app.get("/nutrition/suggestions")
+async def nutrition_suggestions(db: DbDep, llm: Annotated[Gemini, Depends(get_llm)]) -> dict:
+    try:
+        return await suggestions.suggestions(db, llm, await user_tz(db))
+    except LlmError as e:
+        raise HTTPException(502, f"KI nicht erreichbar: {e}") from e
 
 
 @app.get("/pending")

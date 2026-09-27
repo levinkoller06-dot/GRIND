@@ -90,10 +90,10 @@ export function Chat() {
   }
 
   return (
-    <section className="rounded-2xl border border-border bg-surface p-4">
+    <section className="flex h-[70dvh] flex-col rounded-2xl border border-border bg-surface p-4 md:h-full md:min-h-0">
       <h2 className="mb-3 font-bold">🧠 Gehirn</h2>
 
-      <div className="flex max-h-[28rem] flex-col gap-2 overflow-y-auto pr-1">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1">
         {messages.length === 0 && !busy && (
           <div className="rounded-xl bg-surface-2 p-3 text-sm text-muted">
             Schreib einfach, was ansteht. Ich sortiere es für dich ein.
