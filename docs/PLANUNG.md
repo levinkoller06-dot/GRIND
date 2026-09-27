@@ -1,101 +1,124 @@
 # GRIND – Planung
 
-Persönliche Alltags-App: ein Ort für Essen, Lernen, Termine und Mails, mit KI-Unterstützung.
+Persönliche Alltags-App für Schule, Gym und Leben. Im Zentrum steht eine KI („das Gehirn“), die Anfragen versteht und selbst in die richtigen Bereiche einsortiert.
 
-## 1. Ziel
+## 1. Grundidee
 
-Eine App, die ich jeden Tag öffne und die mir zeigt:
-- was heute ansteht (Termine, Tests, Aufgaben),
-- wie ich heute gegessen habe,
-- was ich lernen sollte,
-- welche Mails eine Antwort brauchen.
+Statt viele einzelne Module zu programmieren, bekommt GRIND einen **KI-Kern (Agent-Harness)** mit Werkzeugen:
 
-Und die mir Arbeit abnimmt: Essen per Foto erfassen, Lernfragen erzeugen, Termine eintragen, Mail-Antworten vorschlagen.
+- **Die App** ist die Oberfläche: Start-Tab mit Chat plus Tabs zum Durchklicken.
+- **Der Harness** ist das Herz: nimmt die Anfrage, gibt sie an die KI und führt die Tools aus, die die KI auswählt.
+- **Tools** sind kleine Funktionen: „Termin eintragen“, „Training speichern“, „Note hinzufügen“, „Mails lesen“, „Mahlzeit eintragen“ …
 
-## 2. Module
+Beispiel:
+> „Hab heute 3×10 Liegestütze gemacht, Mittag gab's Nudeln mit Hähnchen und Donnerstag ist Mathetest.“
 
-### 2.1 Dashboard „Heute“
-- Tagesübersicht: Termine, fällige Aufgaben, nächste Tests, Kalorien/Makros, offene Mails
-- Kurzer KI-Tagesbrief am Morgen („Heute: Mathe-Test in 3 Tagen, 2 Mails warten“)
+→ Training gespeichert, Mahlzeit mit Kalorien/Protein eingetragen, Test im Kalender, Lernplan bis Donnerstag angelegt, alles in einem Schritt.
 
-### 2.2 Essen-Tracking
-- Mahlzeit per **Foto** (KI schätzt Gericht, Kalorien, Eiweiß/Kohlenhydrate/Fett), per **Text** („2 Brote mit Käse“) oder **Barcode** (Open Food Facts)
-- Tagesziele (Kalorien, Protein), Wasser
-- Verlauf und Wochenstatistik
-- Favoriten / häufige Mahlzeiten mit einem Tipp erneut eintragen
+**Neue Funktion = ein neues Tool.** Tabs und KI nutzen **dieselbe Datenbank**: Was ich im Tab von Hand eintrage, weiß die KI auch, und umgekehrt.
 
-### 2.3 Lernen & Tests
-- Fächer und Tests mit Datum anlegen → landet automatisch im Kalender
-- Lernplan: App verteilt Lerneinheiten bis zum Testdatum
-- Karteikarten mit Spaced Repetition (Wiederholung nach Vergessenskurve)
-- KI erzeugt Karteikarten / Quizfragen aus Notizen, Fotos vom Heft oder PDFs
-- Nach dem Test: Note eintragen, Notenschnitt pro Fach
+## 2. Aufbau der App
 
-### 2.4 Kalender & Aufgaben
-- Anbindung an **Google Kalender** (lesen + schreiben)
-- Termine per Sprache/Text eintragen („Nächsten Dienstag 15 Uhr Zahnarzt“) → KI macht daraus einen Termin
-- Einfache To-do-Liste mit Fälligkeiten
+### Start-Tab: Das Gehirn
+- Oben: Tagesübersicht, also heutiges Training, nächster Test, Kalorien/Protein, neue Mails, Pakete
+- Darunter: Chat (Text, später Sprache). Die KI sortiert alles selbst in die Tabs.
 
-### 2.5 Mails
-- Anbindung an **Gmail** (Lesen, Entwürfe erstellen)
-- KI sortiert: „braucht Antwort“, „nur Info“, „Werbung“
-- KI schreibt Antwort-**Entwürfe**; gesendet wird erst nach meiner Bestätigung
-- Kurze Zusammenfassung langer Mails
+### Tabs zum Durchklicken
+| Tab | Inhalt |
+|---|---|
+| 📅 **Kalender** | Schule, Termine, Tests, Geburtstage |
+| 📊 **Noten & Lernen** | Fächer, Noten, Schnitt, Tests, Lernplan, Karteikarten |
+| 💪 **Gym & Essen** | Trainingsplan, Fortschritt, Rekorde, Mahlzeiten, Kalorien, Protein |
+| 📬 **Mails & Pakete** | Mail-Zusammenfassungen, Antwort-Entwürfe, Lieferstatus |
+| 🎮 **Freizeit** | Gaming-News, Free Games, Watchlist |
+| 💰 **Geld** | Taschengeld, Sparziele, Preis-Wächter |
 
-### 2.6 Später: Assistent
-- Chat/Sprache als zentrale Eingabe („Trag ein, dass ich Pizza gegessen hab“)
-- Mögliche Verbindung zum Sprachassistenten aus dem Projekt NEXO
+## 3. Architektur
 
-## 3. Technik (Vorschlag)
+```
+┌──────────────── App (Handy / PC) ────────────────┐
+│  Start-Tab (Übersicht + Chat)   │  Tabs          │
+└───────────────┬─────────────────┴───────┬────────┘
+                │ Chat-Nachricht          │ normale Abfragen
+                ▼                         ▼
+┌──────────── Backend ─────────────────────────────┐
+│  Harness: Nachricht → KI → Tool-Aufrufe → Antwort│
+│  Tools: kalender, noten, training, essen, mails… │
+│  Zeitplan-Jobs (ohne KI): Erinnerungen, Morgen-  │
+│  Check, Paket-/Preis-Abfragen                    │
+└───────────────┬──────────────────────────────────┘
+                ▼
+        Datenbank  ·  Google Kalender/Gmail  ·  externe APIs
+```
+
+### Regeln für den Harness
+1. **Nachfragen vor Änderungen nach außen:** Mails senden, Termine löschen und Ähnliches passieren erst nach Bestätigung per Button. Einfaches Speichern (Training, Mahlzeit, Note) läuft direkt, lässt sich aber rückgängig machen.
+2. **Nicht alles braucht KI:** Erinnerungen, Timer, Morgen-Check, Paket- und Preisabfragen laufen als normaler Code nach Zeitplan. Das ist schneller, gratis und zuverlässiger.
+3. **Jede Aktion wird geloggt**, damit man sieht, was die KI gemacht hat.
+4. **KI-Anbieter austauschbar:** Start mit Gemini (kostenloses Kontingent), später wechselbar zu z. B. Claude.
+
+## 4. Technik (Vorschlag)
 
 | Bereich | Wahl | Warum |
 |---|---|---|
-| App | **Next.js (React, TypeScript) als PWA** | Läuft am Handy (installierbar) und am PC, ein Code |
-| UI | Tailwind CSS + shadcn/ui | Schnell, sieht gut aus |
-| Datenbank + Login | **Supabase** (Postgres, Auth, Speicher für Fotos) | Kostenloser Einstieg, kein eigener Server nötig |
-| KI | **Claude API** (Vision für Essensfotos, Text für Mails/Lernen/Termine) | Ein Anbieter für alles |
-| Kalender / Mail | Google Calendar API, Gmail API (OAuth) | Direkte Anbindung |
-| Nährwerte | Open Food Facts API | Kostenlos, Barcodes |
-| Hosting | Vercel | Gratis für Privatprojekte, Deploy bei jedem Push |
+| Harness / Backend | **Python + FastAPI** | Volle Kontrolle, man lernt am meisten |
+| KI | **Gemini API** (Function Calling, Bilder für Essensfotos) | Kostenloses Kontingent reicht für den Alltag |
+| Datenbank | **SQLite** am Anfang → später **Supabase (Postgres)** | Einfach starten, später online |
+| App | **Next.js als PWA** (TypeScript, Tailwind) | Am Handy installierbar, läuft auch am PC |
+| Zeitplan-Jobs | APScheduler (im Backend) | Erinnerungen, Morgen-Check |
+| Kalender / Mail | Google Calendar API, Gmail API | Direkte Anbindung |
+| Nährwerte | Open Food Facts | Kostenlos, Barcodes |
 
-Alternative, falls die App sich eher „nativ“ anfühlen soll: Expo (React Native). Empfehlung: erst PWA, wechseln ist später möglich.
+Alternative zum Python-Harness: **n8n** mit dem „AI Agent“-Baustein. Tools werden dort per Drag-and-Drop verbunden, das ist schneller für den Einstieg, gibt aber weniger Kontrolle. Empfehlung: Python.
 
-## 4. Datenmodell (erste Version)
+## 5. Tools (erste Liste)
 
-- `profiles` – Ziele (Kalorien, Protein), Einstellungen
-- `meals` – Datum, Typ (Frühstück…), Foto, Einträge
-- `meal_items` – Name, Menge, kcal, Protein, KH, Fett
-- `subjects` – Fach, Farbe
-- `exams` – Fach, Datum, Themen, Note
-- `flashcards` – Fach, Frage, Antwort, nächste Wiederholung, Intervall
-- `study_sessions` – geplante/erledigte Lerneinheiten
-- `tasks` – Titel, fällig am, erledigt
-- `mail_triage` – Gmail-ID, Kategorie, Zusammenfassung, Entwurf
+| Bereich | Tools |
+|---|---|
+| Kalender | `termin_eintragen`, `termine_abfragen`, `termin_loeschen`* |
+| Noten & Lernen | `note_eintragen`, `test_anlegen`, `lernplan_erstellen`, `karteikarten_erzeugen`, `schnitt_berechnen` |
+| Gym | `training_speichern`, `trainings_abfragen`, `rekord_pruefen` |
+| Essen | `mahlzeit_eintragen` (Text/Foto), `naehrwerte_suchen`, `tagesbilanz` |
+| Mails | `mails_zusammenfassen`, `antwort_entwerfen`, `mail_senden`* |
+| Pakete | `paket_hinzufuegen`, `paketstatus` |
+| Freizeit | `free_games`, `watchlist_hinzufuegen` |
+| Geld | `ausgabe_eintragen`, `sparziel_setzen`, `preis_beobachten` |
 
-## 5. Fahrplan
+\* nur mit Bestätigung
+
+## 6. Datenmodell (erste Version)
+
+- `events`: Titel, Start, Ende, Typ (Schule/Termin/Test/Geburtstag), Google-ID
+- `subjects`, `grades`: Fach, Note, Gewichtung, Datum
+- `exams`: Fach, Datum, Themen · `flashcards`: Frage, Antwort, nächste Wiederholung
+- `workouts`, `workout_sets`: Übung, Sätze, Wiederholungen, Gewicht
+- `meals`, `meal_items`: Name, Menge, kcal, Protein, KH, Fett, Foto
+- `packages`: Sendungsnummer, Anbieter, Status
+- `transactions`, `savings_goals`, `price_watches`
+- `watchlist`
+- `chat_messages`, `tool_log`: Verlauf und was die KI ausgeführt hat
+
+## 7. Fahrplan
 
 | Phase | Inhalt | Ergebnis |
 |---|---|---|
-| **0 – Setup** | Next.js-Projekt, Supabase, Login, Deploy auf Vercel, PWA | Leere App läuft am Handy |
-| **1 – Heute + Aufgaben** | Dashboard, To-dos | Erster täglicher Nutzen |
-| **2 – Essen** | Manuell + Foto-Erkennung mit Claude, Tagesziele, Statistik | Essen-Tracking komplett |
-| **3 – Lernen** | Fächer, Tests, Karteikarten, Spaced Repetition, KI-Karten aus Notizen | Lernmodul |
-| **4 – Kalender** | Google Kalender verbinden, Tests automatisch eintragen, Termine per Text | Alles an einem Ort |
-| **5 – Mails** | Gmail verbinden, Sortierung, Zusammenfassung, Antwort-Entwürfe | Mail-Helfer |
-| **6 – Assistent** | Chat/Sprache als zentrale Eingabe, Morgenbrief | „Alles per Satz“ |
+| **0 – Setup** | Python-Backend, Datenbank, Next.js-App mit Tab-Gerüst | Leere App läuft |
+| **1 – Gehirn** | Harness mit Gemini, Chat im Start-Tab, erste Tools: Kalender (lokal) + Noten | „Donnerstag Mathetest“ funktioniert |
+| **2 – Gym & Essen** | Training + Mahlzeiten (Text und Foto), Tab mit Fortschritt | Täglicher Nutzen |
+| **3 – Übersicht & Zeitplan** | Tagesübersicht, Morgen-Check, Erinnerungen | App meldet sich selbst |
+| **4 – Lernen** | Lernplan bis zum Test, Karteikarten | Lernmodul |
+| **5 – Google** | Google Kalender + Gmail (Zusammenfassung, Entwürfe) | Echte Daten |
+| **6 – Extras** | Pakete, Geld, Freizeit | Alle Tabs |
+| **7 – Online & Sprache** | Hosting, Handy-Installation, Spracheingabe | Überall nutzbar |
 
-Jede Phase ist für sich nutzbar – nach Phase 2 hat man schon eine brauchbare App.
+## 8. Offene Fragen
 
-## 6. Offene Fragen
+1. Python oder n8n für den Harness? (Empfehlung: Python)
+2. Soll die App nur für mich sein oder auch für Freunde?
+3. Welche Mail-Adresse und welcher Kalender sollen angebunden werden? (Plan geht von Google aus)
 
-1. Hauptsächlich am Handy, am PC oder beides?
-2. Schule, Ausbildung oder Uni? (beeinflusst Noten-System und Lernplan)
-3. Welcher Mail-/Kalenderanbieter? (Plan geht von Google aus)
-4. Nur für mich oder sollen andere die App auch nutzen können?
-5. Budget für die KI-API (Foto-Erkennung kostet pro Bild ein paar Zehntel Cent)?
+## 9. Datenschutz
 
-## 7. Datenschutz
-
-- API-Schlüssel nur in `.env.local`, nie im Repo
-- Mails und Essensfotos nur im eigenen Supabase-Projekt
-- KI sendet nie selbstständig Mails – immer nur Entwürfe
+- API-Schlüssel nur in `.env`, nie im Repo
+- Daten in der eigenen Datenbank
+- KI verschickt nie selbstständig etwas, immer erst nach Bestätigung

@@ -1,17 +1,15 @@
 # GRIND
 
-Persönliche Alltags-App mit KI: Essen tracken, lernen und Tests planen, Kalender und Mails an einem Ort.
+Alltags-App für Schule, Gym und Leben – mit einer KI im Zentrum, die alles selbst einsortiert.
 
 **Status:** Planung – siehe [docs/PLANUNG.md](docs/PLANUNG.md)
 
-## Module
+## Konzept
 
-- **Heute** – Tagesübersicht mit Terminen, Aufgaben, Essen und Mails
-- **Essen** – Mahlzeiten per Foto, Text oder Barcode, Kalorien und Makros
-- **Lernen** – Tests, Lernplan, Karteikarten mit Spaced Repetition
-- **Kalender** – Google-Kalender-Anbindung, Termine per Text eintragen
-- **Mails** – Gmail sortieren, zusammenfassen, Antwort-Entwürfe
+- **Start-Tab = Gehirn:** Tagesübersicht + Chat. Einfach schreiben („Hab 3×10 Liegestütze gemacht und Donnerstag ist Mathetest“) – die KI trägt alles ein.
+- **Tabs zum Durchklicken:** 📅 Kalender · 📊 Noten & Lernen · 💪 Gym & Essen · 📬 Mails & Pakete · 🎮 Freizeit · 💰 Geld
+- **Agent-Harness:** Die KI bekommt Tools (Termin eintragen, Training speichern, Note hinzufügen …) und entscheidet selbst, welche sie nutzt. Neue Funktion = neues Tool.
 
 ## Geplanter Stack
 
-Next.js (PWA) · TypeScript · Tailwind · Supabase · Claude API · Google APIs · Vercel
+Python (FastAPI) · Gemini API · SQLite → Supabase · Next.js (PWA) · Google APIs
