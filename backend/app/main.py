@@ -11,6 +11,8 @@ from app.auth import UserDep
 from app.config import Settings, get_settings
 from app.db import Db, DbError
 from app.llm import Gemini, LlmError
+from app.mail import service as mail_service
+from app.mail.imap import PRESETS, MailError
 
 app = FastAPI(title="GRIND Backend")
 
@@ -32,6 +34,11 @@ async def db_error(_: Request, exc: DbError) -> JSONResponse:
         else f"Datenbank-Fehler: {exc}"
     )
     return JSONResponse({"detail": detail}, status_code=500)
+
+
+@app.exception_handler(MailError)
+async def mail_error(_: Request, exc: MailError) -> JSONResponse:
+    return JSONResponse({"detail": str(exc)}, status_code=400)
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -106,6 +113,49 @@ async def nutrition_suggestions(db: DbDep, llm: Annotated[Gemini, Depends(get_ll
         return await suggestions.suggestions(db, llm, await user_tz(db))
     except LlmError as e:
         raise HTTPException(502, f"KI nicht erreichbar: {e}") from e
+
+
+class MailAccountIn(BaseModel):
+    email: str = Field(min_length=3, max_length=200)
+    password: str = Field(min_length=1, max_length=500)
+    preset: str | None = None
+    label: str | None = Field(default=None, max_length=40)
+    color: str | None = None
+    imap_host: str | None = None
+    imap_port: int | None = None
+    smtp_host: str | None = None
+    smtp_port: int | None = None
+
+
+@app.get("/mail/presets")
+def mail_presets() -> dict:
+    return PRESETS
+
+
+@app.get("/mail/accounts")
+async def mail_accounts(db: DbDep) -> list[dict]:
+    return await mail_service.list_accounts(db)
+
+
+@app.post("/mail/accounts")
+async def add_mail_account(body: MailAccountIn, db: DbDep) -> dict:
+    return await mail_service.add_account(db, body.model_dump())
+
+
+@app.delete("/mail/accounts/{account_id}")
+async def delete_mail_account(account_id: str, db: DbDep) -> dict:
+    await db.delete("mail_accounts", id=f"eq.{account_id}")
+    return {"geloescht": True}
+
+
+@app.get("/mail/inbox")
+async def mail_inbox(db: DbDep, days: int = 7) -> dict:
+    return await mail_service.inbox(db, days=min(days, 30), limit=40)
+
+
+@app.get("/mail/message/{mail_id}")
+async def mail_message(mail_id: str, db: DbDep) -> dict:
+    return await mail_service.read(db, mail_id)
 
 
 @app.get("/pending")

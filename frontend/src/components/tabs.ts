@@ -11,7 +11,7 @@ export const TABS: Tab[] = [
   { href: "/noten", label: "Noten", icon: "📊", description: "Fächer, Noten und Tests" },
   { href: "/gym", label: "Gym", icon: "💪", description: "Dein Trainingsplan" },
   { href: "/ernaehrung", label: "Ernährung", icon: "🥗", description: "Kalorien, Protein und was du noch essen solltest" },
-  { href: "/mails", label: "Mails", icon: "📬", description: "Zusammenfassungen, Entwürfe, Pakete" },
+  { href: "/mails", label: "Mails", icon: "📬", description: "Alle Postfächer an einem Ort" },
   { href: "/freizeit", label: "Freizeit", icon: "🎮", description: "Gaming-News, Free Games, Watchlist" },
   { href: "/geld", label: "Geld", icon: "💰", description: "Taschengeld, Sparziele, Preis-Wächter" },
 ];

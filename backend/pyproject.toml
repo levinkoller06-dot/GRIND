@@ -5,6 +5,7 @@ description = "GRIND – Python-Backend mit dem KI-Harness"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "cryptography>=50.0.1",
     "fastapi>=0.141.1",
     "httpx>=0.28.1",
     "pydantic-settings>=2.15.0",

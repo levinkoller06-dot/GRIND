@@ -4,6 +4,8 @@ from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 from app.db import Db
+from app.mail import service as mail_service
+from app.mail.imap import MailError
 from app.tools.kalender import event_times
 
 
@@ -40,9 +42,32 @@ async def _delete_event(db: Db, payload: dict, tz: ZoneInfo) -> dict:
     return {"geloescht": True}
 
 
-EXECUTORS = {"event.create": _create_event, "event.delete": _delete_event}
+async def _send_mail(db: Db, payload: dict, tz: ZoneInfo) -> dict:
+    try:
+        return await mail_service.send(db, payload)
+    except MailError as e:
+        raise ActionError(str(e)) from e
 
-EDITABLE = {"titel", "datum", "uhrzeit", "ende_uhrzeit", "art", "notiz", "ort", "mit"}
+
+EXECUTORS = {
+    "event.create": _create_event,
+    "event.delete": _delete_event,
+    "mail.send": _send_mail,
+}
+
+EDITABLE = {
+    "titel",
+    "datum",
+    "uhrzeit",
+    "ende_uhrzeit",
+    "art",
+    "notiz",
+    "ort",
+    "mit",
+    "an",
+    "betreff",
+    "text",
+}
 
 
 async def decide(db: Db, action_id: str, confirm: bool, changes: dict, tz: ZoneInfo) -> dict:

@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-3.8-flash"
     gemini_fallback_model: str = "gemini-3.5-flash-lite"
 
+    # Schlüssel zum Verschlüsseln von Mail-Passwörtern (Fernet)
+    encryption_key: str = ""
+
     frontend_origins: list[str] = ["http://localhost:3000"]
 
     @property

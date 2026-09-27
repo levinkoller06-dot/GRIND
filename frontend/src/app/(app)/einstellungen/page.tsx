@@ -2,6 +2,7 @@ import { SETTINGS_TAB } from "@/components/tabs";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/login/actions";
 import { SCALE_LABEL, type GradeScale } from "@/lib/grades";
+import { MailAccounts } from "@/components/MailAccounts";
 import { saveProfile } from "./actions";
 
 export default async function EinstellungenPage() {
@@ -16,7 +17,7 @@ export default async function EinstellungenPage() {
   const field = "w-full rounded-xl border border-border bg-background px-3 py-2 text-sm";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:overflow-y-auto">
       <header>
         <h1 className="text-3xl font-black tracking-tight">
           {SETTINGS_TAB.icon} {SETTINGS_TAB.label}
@@ -65,9 +66,7 @@ export default async function EinstellungenPage() {
         </form>
       </section>
 
-      <section className="rounded-2xl border border-dashed border-border bg-surface p-4 text-sm text-muted">
-        Google verbinden (Kalender + Gmail) kommt in Phase 3.
-      </section>
+      <MailAccounts />
     </div>
   );
 }

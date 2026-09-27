@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, type ChatMessage, type ChatResponse, type PendingAction } from "@/lib/api";
 import { prepareImage, type ChatImage } from "@/lib/image";
+import { MailCard } from "./MailCard";
 import { PendingCard } from "./PendingCard";
 
 const EXAMPLES = [
@@ -120,9 +121,13 @@ export function Chat() {
             denkt nach …
           </div>
         )}
-        {pending.map((a) => (
-          <PendingCard key={a.id} action={a} onDone={onDecided} />
-        ))}
+        {pending.map((a) =>
+          a.kind === "mail.send" ? (
+            <MailCard key={a.id} action={a} onDone={onDecided} />
+          ) : (
+            <PendingCard key={a.id} action={a} onDone={onDecided} />
+          ),
+        )}
         <div ref={bottom} />
       </div>
 

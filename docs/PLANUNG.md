@@ -169,15 +169,23 @@ Alle Tabellen haben `user_id` und Row Level Security.
 | **5 – Zeitplan & n8n** | n8n aufsetzen: Morgen-Check, Mail-Abruf, Erinnerungen | App meldet sich selbst |
 | **6 – Lernen & Extras** | Lernplan, Karteikarten, Pakete, Geld, Freizeit | Alle Tabs |
 | **6b – Projekte** | Projekte-Tab: Ordner pro Projekt mit Aufgaben, Notizen, Dateien und Deadlines; Tools `projekt_anlegen`, `aufgabe_hinzufuegen` | Schul- und Privatprojekte im Griff |
+| **4b – Schul-Mail** | Microsoft 365 per Microsoft-Login (Graph API, App-Registrierung) ins gemeinsame Postfach | Alle drei Postfächer |
 | **7 – Online & Sprache** | Hosting, Handy-Installation, Spracheingabe | Freunde können mitmachen |
 
-## 10. Wichtig bei mehreren Nutzern
+## 10. App auf PC und Handy + Benachrichtigungen
+
+- **Voraussetzung:** GRIND läuft online (Frontend z. B. Vercel, Backend z. B. Render/Railway), nicht mehr auf localhost.
+- **Schritt 1 – PWA:** installierbar über Chrome/Edge (Windows: Startmenü + eigenes Fenster) und Android (Startbildschirm).
+- **Push-Nachrichten:** Web Push (VAPID). Ein Zeitplan-Job prüft z. B. um 18 Uhr: Protein unter Ziel? Training laut Plan heute, aber nichts eingetragen? → Nachricht aufs Handy/den PC.
+- **Schritt 2 (optional) – echte Installer:** Tauri → Windows-Installer (.exe), Capacitor → Android-App (.apk). Gleicher Code.
+
+## 11. Wichtig bei mehreren Nutzern
 
 - **Google-Freigabe:** Solange die App im Google-„Testmodus“ ist, können bis zu 100 Nutzer mitmachen, die man vorher als Tester einträgt. Die Anmeldung läuft dann nach 7 Tagen ab und muss erneuert werden. Für Gmail-Zugriff ohne diese Grenzen verlangt Google eine aufwendige Prüfung. Für einen Freundeskreis reicht der Testmodus.
 - **Gemini kostenlos:** Im kostenlosen Kontingent darf Google die Eingaben zur Verbesserung nutzen, und es gibt Anfrage-Limits. Bei Mails von mehreren Leuten lohnt sich später die bezahlte Stufe (dann keine Nutzung zum Training, sehr günstig pro Anfrage).
 - **Datenschutz:** Mails und Noten von Freunden sind sensible Daten. Nutzer müssen zustimmen und ihr Konto samt Daten löschen können.
 
-## 11. Datenschutz & Sicherheit
+## 12. Datenschutz & Sicherheit
 
 - API-Schlüssel nur in `.env`, nie im Repo
 - Google-Tokens verschlüsselt in der Datenbank
