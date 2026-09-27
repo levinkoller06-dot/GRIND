@@ -30,7 +30,10 @@ export function MailAccounts() {
       .catch((e) => setError(e.message));
   }, []);
 
-  async function add(form: FormData) {
+  async function add(event: React.FormEvent<HTMLFormElement>) {
+    // onSubmit statt action: sonst leert React das Formular auch bei einem Fehler
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
     setBusy(true);
     setError(null);
     const value = (k: string) => String(form.get(k) ?? "").trim() || null;
@@ -93,7 +96,7 @@ export function MailAccounts() {
       </ul>
 
       {adding && (
-        <form action={add} className="space-y-2 rounded-xl bg-surface-2 p-3">
+        <form onSubmit={add} className="space-y-2 rounded-xl bg-surface-2 p-3">
           <select value={preset} onChange={(e) => setPreset(e.target.value as Preset)} className={field}>
             {(Object.keys(PRESETS) as Preset[]).map((p) => (
               <option key={p} value={p}>

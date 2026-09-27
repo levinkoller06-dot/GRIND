@@ -48,6 +48,10 @@ async def add_account(db: Db, data: dict) -> dict:
     }
     if not all(settings.values()):
         raise imap.MailError("Server-Angaben fehlen (IMAP/SMTP)")
+    password = data["password"]
+    if data.get("preset") == "gmail" or "gmail" in (settings["imap_host"] or ""):
+        # Google zeigt App-Passwörter mit Leerzeichen an ("abcd efgh ijkl mnop")
+        password = "".join(password.split())
     account = imap.ImapAccount(
         id="neu",
         email=data["email"].strip(),
@@ -65,7 +69,7 @@ async def add_account(db: Db, data: dict) -> dict:
             "label": data.get("label") or None,
             "color": data.get("color") or None,
             **settings,
-            "secret_enc": encrypt(data["password"]),
+            "secret_enc": encrypt(password),
         },
     )
     return {k: row[k] for k in PUBLIC_FIELDS.split(",")}
