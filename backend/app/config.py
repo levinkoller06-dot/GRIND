@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     # asymmetrische Schlüssel, die über JWKS geladen werden.
     supabase_jwt_secret: str = ""
 
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-3.8-flash"
+    gemini_fallback_model: str = "gemini-3.5-flash-lite"
+
     frontend_origins: list[str] = ["http://localhost:3000"]
 
     @property

@@ -1,0 +1,119 @@
+import asyncio
+from zoneinfo import ZoneInfo
+
+import pytest
+
+from app import actions, harness
+from app.tools.kalender import event_times
+from tests.fakes import FakeDb, FakeLlm, calls, text
+
+TZ = ZoneInfo("Europe/Berlin")
+
+
+def run(coro):
+    return asyncio.run(coro)
+
+
+def test_mehrere_dinge_in_einer_nachricht():
+    db = FakeDb()
+    llm = FakeLlm(
+        calls(
+            ("note_eintragen", {"fach": "Englisch", "note": 2}),
+            ("test_anlegen", {"fach": "Mathe", "datum": "2026-10-01"}),
+        ),
+        text("Note gespeichert und Mathe-Test zum Bestätigen hingelegt."),
+    )
+
+    result = run(harness.chat(db, llm, "Hab ne 2 in Englisch und Donnerstag ist Mathetest"))
+
+    assert result["tools"] == ["note_eintragen", "test_anlegen"]
+    assert result["reply"].startswith("Note gespeichert")
+    assert {s["name"] for s in db.tables["subjects"]} == {"Englisch", "Mathe"}
+    assert db.tables["grades"][0]["value"] == 2
+    assert len(db.tables["exams"]) == 1
+    # Termin nur vorgeschlagen, nicht eingetragen
+    assert "events" not in db.tables
+    assert result["pending"][0]["kind"] == "event.create"
+    assert result["pending"][0]["payload"]["titel"] == "Mathe-Test"
+    # Tool-Ergebnisse gehen an die KI zurück
+    last_request = llm.requests[1]
+    assert "functionResponse" in last_request[-1]["parts"][0]
+    # Verlauf und Protokoll gespeichert
+    assert [m["role"] for m in db.tables["chat_messages"]] == ["user", "assistant"]
+    assert len(db.tables["tool_log"]) == 2
+
+
+def test_tool_fehler_wird_an_ki_gemeldet():
+    db = FakeDb()
+    llm = FakeLlm(
+        calls(("termin_vorschlagen", {"titel": "Zahnarzt", "datum": "nächste Woche"})),
+        text("Welches Datum genau?"),
+    )
+    result = run(harness.chat(db, llm, "Zahnarzt nächste Woche"))
+
+    response = llm.requests[1][-1]["parts"][0]["functionResponse"]["response"]
+    assert "fehler" in response
+    assert db.tables["tool_log"][0]["ok"] is False
+    assert result["pending"] == []
+
+
+def test_fach_wird_wiederverwendet():
+    db = FakeDb()
+    for note in (2, 4):
+        run(
+            harness.chat(
+                db,
+                FakeLlm(calls(("note_eintragen", {"fach": "mathe", "note": note})), text("ok")),
+                "x",
+            )
+        )
+    assert len(db.tables["subjects"]) == 1
+    assert db.tables["tool_log"][1]["result"]["neuer_schnitt"] == 3
+
+
+def test_tageslimit():
+    db = FakeDb()
+    db.tables["profiles"] = [{"id": "user-1", "ai_daily_limit": 1}]
+    run(harness.chat(db, FakeLlm(text("hi")), "hallo"))
+    with pytest.raises(harness.LimitReached):
+        run(harness.chat(db, FakeLlm(text("hi")), "nochmal"))
+
+
+def test_event_times():
+    start, end, all_day = event_times({"datum": "2026-10-01"}, TZ)
+    assert all_day and end is None and start.hour == 0
+
+    start, end, all_day = event_times(
+        {"datum": "2026-10-01", "uhrzeit": "15:00", "ende_uhrzeit": "16:30"}, TZ
+    )
+    assert not all_day and start.isoformat() == "2026-10-01T15:00:00+02:00"
+    assert (end - start).seconds == 90 * 60
+
+
+def test_bestaetigen_mit_aenderung():
+    db = FakeDb()
+    llm = FakeLlm(
+        calls(("termin_vorschlagen", {"titel": "Zahnarzt", "datum": "2026-10-02"})), text("ok")
+    )
+    pending = run(harness.chat(db, llm, "Zahnarzt Freitag"))["pending"][0]
+
+    result = run(actions.decide(db, pending["id"], True, {"uhrzeit": "09:30"}, TZ))
+
+    assert result["status"] == "confirmed"
+    event = db.tables["events"][0]
+    assert event["title"] == "Zahnarzt"
+    assert event["starts_at"] == "2026-10-02T09:30:00+02:00"
+    assert db.tables["pending_actions"][0]["status"] == "confirmed"
+    with pytest.raises(actions.ActionError):
+        run(actions.decide(db, pending["id"], True, {}, TZ))
+
+
+def test_ablehnen():
+    db = FakeDb()
+    llm = FakeLlm(
+        calls(("termin_vorschlagen", {"titel": "Kino", "datum": "2026-10-03"})), text("ok")
+    )
+    pending = run(harness.chat(db, llm, "Kino Samstag"))["pending"][0]
+    run(actions.decide(db, pending["id"], False, {}, TZ))
+    assert db.tables["pending_actions"][0]["status"] == "rejected"
+    assert "events" not in db.tables

@@ -1,0 +1,74 @@
+from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
+
+from app.tools.base import ToolContext, obj, propose, tool
+
+KINDS = ["schule", "termin", "test", "geburtstag", "sonstiges"]
+
+
+def event_times(payload: dict, tz: ZoneInfo) -> tuple[datetime, datetime | None, bool]:
+    """Wandelt Datum/Uhrzeit aus einem Vorschlag in Zeitstempel um."""
+    day = date.fromisoformat(payload["datum"])
+    start_time = payload.get("uhrzeit")
+    if not start_time:
+        return datetime.combine(day, time.min, tz), None, True
+    start = datetime.combine(day, time.fromisoformat(start_time), tz)
+    end_time = payload.get("ende_uhrzeit")
+    end = datetime.combine(day, time.fromisoformat(end_time), tz) if end_time else None
+    if end and end <= start:
+        end += timedelta(days=1)
+    return start, end, False
+
+
+def describe(payload: dict) -> str:
+    when = payload["datum"] + (f" {payload['uhrzeit']}" if payload.get("uhrzeit") else "")
+    return f"Termin „{payload['titel']}“ am {when}."
+
+
+@tool(
+    "termin_vorschlagen",
+    "Schlägt einen Kalendertermin vor. Der Termin wird erst eingetragen, wenn der Nutzer "
+    "bestätigt. Für Tests/Klassenarbeiten stattdessen test_anlegen verwenden.",
+    obj(
+        {
+            "titel": {"type": "string", "description": "Kurzer Titel, z. B. 'Zahnarzt'"},
+            "datum": {"type": "string", "description": "Datum im Format YYYY-MM-DD"},
+            "uhrzeit": {"type": "string", "description": "Startzeit HH:MM, weglassen = ganztägig"},
+            "ende_uhrzeit": {"type": "string", "description": "Endzeit HH:MM (optional)"},
+            "art": {"type": "string", "enum": KINDS},
+            "notiz": {"type": "string"},
+        },
+        ["titel", "datum"],
+    ),
+)
+async def termin_vorschlagen(ctx: ToolContext, args: dict) -> dict:
+    payload = {k: v for k, v in args.items() if v not in (None, "")}
+    payload.setdefault("art", "termin")
+    event_times(payload, ctx.tz)  # prüft das Format, bevor der Vorschlag entsteht
+    return await propose(ctx, "event.create", payload, describe(payload))
+
+
+@tool(
+    "termine_abfragen",
+    "Listet Termine (inkl. Tests) in einem Zeitraum auf.",
+    obj(
+        {
+            "von": {"type": "string", "description": "YYYY-MM-DD, Standard: heute"},
+            "bis": {"type": "string", "description": "YYYY-MM-DD, Standard: in 14 Tagen"},
+        }
+    ),
+)
+async def termine_abfragen(ctx: ToolContext, args: dict) -> dict:
+    today = ctx.now.date()
+    start = date.fromisoformat(args.get("von") or today.isoformat())
+    end = date.fromisoformat(args.get("bis") or (today + timedelta(days=14)).isoformat())
+    rows = await ctx.db.select(
+        "events",
+        select="title,starts_at,ends_at,all_day,kind",
+        order="starts_at",
+        **{
+            "starts_at": f"gte.{datetime.combine(start, time.min, ctx.tz).isoformat()}",
+            "and": f"(starts_at.lt.{datetime.combine(end + timedelta(days=1), time.min, ctx.tz).isoformat()})",
+        },
+    )
+    return {"termine": rows}
