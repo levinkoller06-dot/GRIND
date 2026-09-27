@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     # Reihenfolge der Modelle: ist eines aufgebraucht/zu langsam, kommt das nächste dran
     gemini_models: str = "gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.8-flash"
 
+    # Jev (TypeSafe AI) über OpenRouter – schnelle Entscheidungen (Kategorien, Tool-Auswahl)
+    openrouter_api_key: str = ""
+    jev_model: str = "typesafe/jev-1.13"
+
     # Schlüssel zum Verschlüsseln von Mail-Passwörtern (Fernet)
     encryption_key: str = ""
 

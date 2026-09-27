@@ -5,6 +5,7 @@ import logging
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
+from app import router
 from app.db import Db
 from app.llm import Gemini
 from app.tools import REGISTRY, ToolContext
@@ -83,7 +84,7 @@ Regeln:
   Gruss mit seinem Namen), kurz und freundlich. Fasse Mails knapp zusammen statt sie abzuschreiben.
 - Mails löschen/aufräumen: mails_abfragen mit kompakt=true (bei „alle“ ruhig tage=30), dann passende
   IDs mit mails_loeschen vorschlagen (landen im Papierkorb, Nutzer bestätigt). Werbung/Spam =
-  newsletter=true oder offensichtliche Werbung (Rabatte, Shops, Gewinnspiele); keine persönlichen
+  kategorie „werbung“ (am einfachsten mails_abfragen mit kategorie="werbung"); keine persönlichen
   Mails, Schule, Rechnungen oder Sicherheits-Mails (z. B. Anmeldecodes) mitlöschen.
   „Alle von Google“ = Absender enthält google.
 - Hat der Nutzer sich vertan („nee, das war gestern“), den falschen Eintrag mit eintrag_loeschen
@@ -160,7 +161,10 @@ async def chat(db: Db, llm: Gemini, message: str, image: dict | None = None) -> 
     await db.insert("chat_messages", {"user_id": db.user.id, "role": "user", "content": stored})
 
     ctx = ToolContext(db=db, tz=tz, now=now, grade_scale=profile.get("grade_scale") or "ch")
-    declarations = [t.declaration() for t in REGISTRY.values()]
+    # Jev wählt vor, welche Bereiche (und damit Tools) die Nachricht braucht
+    recent = [p["text"] for c in contents[-4:-1] for p in c["parts"] if "text" in p]
+    groups = await router.select_groups(message, recent, image is not None)
+    declarations = router.declarations(groups)
     subjects = await db.select("subjects", order="name")
     system = system_prompt(
         now, profile.get("display_name"), profile.get("grade_scale") or "ch", subjects
@@ -190,4 +194,9 @@ async def chat(db: Db, llm: Gemini, message: str, image: dict | None = None) -> 
 
     reply = reply or "Erledigt."
     await db.insert("chat_messages", {"user_id": db.user.id, "role": "assistant", "content": reply})
-    return {"reply": reply, "pending": ctx.pending, "tools": tools_used}
+    return {
+        "reply": reply,
+        "pending": ctx.pending,
+        "tools": tools_used,
+        "bereiche": sorted(groups) if groups else None,
+    }

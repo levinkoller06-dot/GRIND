@@ -121,6 +121,7 @@ Weil jeder Nutzer sein eigenes Google-Konto verbindet, läuft **Google (Gmail + 
 | Zeitplan / Automationen | **n8n** (Docker) | Jobs anstoßen, allgemeine Daten holen |
 | Kalender + Mail | Google Calendar API + Gmail API (im Backend, OAuth pro Nutzer) | Jeder verbindet sein eigenes Konto |
 | Nährwerte | Open Food Facts | Kostenlos, Barcodes |
+| Schnelle Entscheidungen | **Jev (TypeSafe AI)** über OpenRouter Decisions API | ~0,3 s, Bruchteile eines Rappens: Mail-Kategorien, „Antwort nötig“, Tool-Vorauswahl fürs Gehirn. Kein Chat/Tool-Calling/Bilder – das bleibt bei Gemini |
 
 Supabase gibt es kostenlos (Cloud) oder lokal per Docker. Zum Entwickeln reicht die kostenlose Cloud-Version.
 

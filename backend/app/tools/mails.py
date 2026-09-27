@@ -6,7 +6,8 @@ from app.tools.base import ToolContext, obj, propose, tool
 @tool(
     "mails_abfragen",
     "Durchsucht das gemeinsame Postfach (alle Mail-Konten des Nutzers). Liefert Absender, "
-    "Betreff, Datum, Vorschau, ID und ob es ein Newsletter/Werbung ist (newsletter=true). "
+    "Betreff, Datum, Vorschau, ID, kategorie (werbung/persoenlich/schule/rechnung/sicherheit/"
+    "sonstiges) und antwort_noetig. "
     "Für Aufräumen/Löschen vieler Mails kompakt=true setzen (mehr Mails, ohne Vorschau).",
     obj(
         {
@@ -20,6 +21,11 @@ from app.tools.base import ToolContext, obj, propose, tool
             "konto": {
                 "type": "string",
                 "description": "Nur ein Konto, z. B. 'gmail' oder 'Schule'",
+            },
+            "kategorie": {
+                "type": "string",
+                "enum": ["werbung", "persoenlich", "schule", "rechnung", "sicherheit", "sonstiges"],
+                "description": "Nur Mails dieser Kategorie",
             },
         }
     ),
@@ -36,13 +42,15 @@ async def mails_abfragen(ctx: ToolContext, args: dict) -> dict:
     )
     if not result["konten"]:
         return {"hinweis": "Noch kein Mail-Konto verbunden (Einstellungen → Mail-Konten)."}
+    if args.get("kategorie"):
+        result["mails"] = [m for m in result["mails"] if m.get("kategorie") == args["kategorie"]]
     if compact:
         result["mails"] = [
             {
                 "id": m["id"],
                 "von": f"{m['von']['name']} <{m['von']['email']}>",
                 "betreff": m["betreff"],
-                "newsletter": m["newsletter"],
+                "kategorie": m.get("kategorie"),
             }
             for m in result["mails"][:150]
         ]

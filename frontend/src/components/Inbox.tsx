@@ -14,8 +14,26 @@ type Mail = {
   datum: string | null;
   gelesen: boolean;
   newsletter: boolean;
+  kategorie: string | null;
+  antwort_noetig: boolean;
   vorschau: string;
 };
+
+const CATEGORY: Record<string, { label: string; cls: string }> = {
+  persoenlich: { label: "Persönlich", cls: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300" },
+  schule: { label: "Schule", cls: "bg-blue-500/15 text-blue-600 dark:text-blue-300" },
+  rechnung: { label: "Rechnung", cls: "bg-amber-500/15 text-amber-600 dark:text-amber-300" },
+  sicherheit: { label: "Sicherheit", cls: "bg-violet-500/15 text-violet-600 dark:text-violet-300" },
+  werbung: { label: "Werbung", cls: "bg-surface-2 text-muted" },
+  sonstiges: { label: "Info", cls: "bg-surface-2 text-muted" },
+};
+
+const FILTERS = [
+  { key: "alle", label: "Alle", match: () => true },
+  { key: "wichtig", label: "Wichtig", match: (m: Mail) => m.antwort_noetig || ["persoenlich", "schule", "rechnung", "sicherheit"].includes(m.kategorie ?? "") },
+  { key: "antwort", label: "Antwort nötig", match: (m: Mail) => m.antwort_noetig },
+  { key: "werbung", label: "Werbung", match: (m: Mail) => m.kategorie === "werbung" },
+] as const;
 
 type Inbox = { mails: Mail[]; fehler: { konto: string; fehler: string }[]; konten: string[] };
 type FullMail = Mail & { text: string; an: string };
@@ -36,6 +54,7 @@ export function Inbox() {
   const [open, setOpen] = useState<FullMail | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("alle");
 
   useEffect(() => {
     api<Inbox>("/mail/inbox")
@@ -90,6 +109,17 @@ export function Inbox() {
             </span>
           ))}
         </div>
+        <div className="flex gap-1 border-b border-border p-2">
+          {FILTERS.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              className={`rounded-lg px-2.5 py-1 text-xs font-medium ${filter === f.key ? "bg-accent text-accent-fg" : "text-muted hover:bg-surface-2"}`}
+            >
+              {f.label} ({inbox.mails.filter(f.match).length})
+            </button>
+          ))}
+        </div>
         {inbox.fehler.map((f) => (
           <p key={f.konto} className="border-b border-border px-3 py-2 text-xs text-red-500">
             {f.konto}: {f.fehler}
@@ -97,7 +127,7 @@ export function Inbox() {
         ))}
         <ul className="divide-y divide-border md:min-h-0 md:overflow-y-auto">
           {inbox.mails.length === 0 && <li className="p-4 text-sm text-muted">Keine Mails in den letzten 7 Tagen.</li>}
-          {inbox.mails.map((m) => (
+          {inbox.mails.filter(FILTERS.find((f) => f.key === filter)!.match).map((m) => (
             <li key={m.id}>
               <button
                 onClick={() => show(m)}
@@ -110,8 +140,15 @@ export function Inbox() {
                     <span className="shrink-0 text-xs text-muted">{loadingId === m.id ? "…" : when(m.datum)}</span>
                   </span>
                   <span className={`block truncate text-sm ${m.gelesen ? "text-muted" : ""}`}>
-                    {m.newsletter && (
-                      <span className="mr-1 rounded bg-surface-2 px-1 text-[10px] text-muted">Newsletter</span>
+                    {m.antwort_noetig && (
+                      <span className="mr-1 rounded bg-red-500/15 px-1 text-[10px] font-semibold text-red-600 dark:text-red-300">
+                        Antwort nötig
+                      </span>
+                    )}
+                    {m.kategorie && CATEGORY[m.kategorie] && (
+                      <span className={`mr-1 rounded px-1 text-[10px] ${CATEGORY[m.kategorie].cls}`}>
+                        {CATEGORY[m.kategorie].label}
+                      </span>
                     )}
                     {m.betreff}
                   </span>

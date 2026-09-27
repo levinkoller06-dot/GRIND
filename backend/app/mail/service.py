@@ -3,7 +3,7 @@
 import asyncio
 
 from app.db import Db
-from app.mail import imap
+from app.mail import classify, imap
 from app.mail.crypto import decrypt, encrypt
 
 # Zwischenspeicher pro Konto: (Konto, Tage, Limit, nur ungelesen) → (Fingerabdruck, Mails)
@@ -120,6 +120,7 @@ async def inbox(
             in f"{m['betreff']} {m['von']['name']} {m['von']['email']} {m['vorschau']}".lower()
         ]
     mails.sort(key=lambda m: m["datum"] or "", reverse=True)
+    await classify.annotate(mails)
     return {"mails": mails, "fehler": errors, "konten": [a.email for a in accounts]}
 
 
