@@ -12,4 +12,4 @@ Alltags-App für Schule, Gym und Leben – mit einer KI im Zentrum, die alles se
 
 ## Geplanter Stack
 
-Python (FastAPI) · Gemini API · SQLite → Supabase · Next.js (PWA) · Google APIs
+Python (FastAPI) · Gemini API · n8n (Mails & Automationen) · SQLite → Supabase · Next.js (PWA) · Google APIs

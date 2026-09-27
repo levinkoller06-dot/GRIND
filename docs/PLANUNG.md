@@ -65,11 +65,36 @@ Beispiel:
 | KI | **Gemini API** (Function Calling, Bilder für Essensfotos) | Kostenloses Kontingent reicht für den Alltag |
 | Datenbank | **SQLite** am Anfang → später **Supabase (Postgres)** | Einfach starten, später online |
 | App | **Next.js als PWA** (TypeScript, Tailwind) | Am Handy installierbar, läuft auch am PC |
-| Zeitplan-Jobs | APScheduler (im Backend) | Erinnerungen, Morgen-Check |
-| Kalender / Mail | Google Calendar API, Gmail API | Direkte Anbindung |
+| Automationen / Zeitplan | **n8n** (Docker) | Mails, Pakete, Preise, Morgen-Check |
+| Kalender | Google Calendar API (im Backend) | Direkte Anbindung |
+| Mail | Gmail über n8n | OAuth per Klick statt Code |
 | Nährwerte | Open Food Facts | Kostenlos, Barcodes |
 
-Alternative zum Python-Harness: **n8n** mit dem „AI Agent“-Baustein. Tools werden dort per Drag-and-Drop verbunden, das ist schneller für den Einstieg, gibt aber weniger Kontrolle. Empfehlung: Python.
+### Mischung: Python-Gehirn + n8n für Automationen
+
+Beides zusammen: **Python** ist das Gehirn (Chat, KI, Datenbank), **n8n** übernimmt die „Leitungen nach außen“, also Mails und alles, was nach Zeitplan läuft.
+
+```
+             ┌──────────── Python-Backend (Gehirn) ────────────┐
+App ───────► │ Harness + Tools + Datenbank                     │
+             │ Tool "mails_zusammenfassen" ──► n8n-Webhook      │
+             │ API /inbox  ◄── n8n schickt Ergebnisse           │
+             └──────────────────────────────────────────────────┘
+                              ▲            │
+                              │ Webhooks   ▼
+             ┌──────────────── n8n ────────────────────────────┐
+             │ Gmail: neue Mails holen, sortieren, zusammen-    │
+             │   fassen, Entwürfe anlegen                       │
+             │ Zeitplan: Morgen-Check, Paketstatus, Preise,     │
+             │   Free Games                                     │
+             └──────────────────────────────────────────────────┘
+```
+
+- **n8n macht:** Gmail (neue Mails holen, Zusammenfassung, Antwort-Entwürfe in Gmail anlegen), Paketstatus, Preis-Wächter, Free Games, Morgen-Check. Das Ergebnis schickt n8n per Webhook an das Backend, das es speichert. So sieht die KI es auch im Chat.
+- **Python macht:** Chat, Harness, alle Tools für Kalender, Noten, Gym, Essen, Geld und die Datenbank.
+- **Verbindung:** Braucht die KI etwas aus den Mails, ruft ein Python-Tool einen n8n-Webhook auf. Beide Seiten prüfen einen gemeinsamen geheimen Schlüssel.
+- **Vorteil:** Gmail-Anmeldung (OAuth) und Zeitpläne klickt man in n8n zusammen, statt sie zu programmieren. Das Gehirn bleibt trotzdem voll in Python.
+- **n8n betreiben:** lokal per Docker oder später auf einem kleinen Server. n8n Cloud ist kostenpflichtig.
 
 ## 5. Tools (erste Liste)
 
@@ -107,15 +132,14 @@ Alternative zum Python-Harness: **n8n** mit dem „AI Agent“-Baustein. Tools w
 | **2 – Gym & Essen** | Training + Mahlzeiten (Text und Foto), Tab mit Fortschritt | Täglicher Nutzen |
 | **3 – Übersicht & Zeitplan** | Tagesübersicht, Morgen-Check, Erinnerungen | App meldet sich selbst |
 | **4 – Lernen** | Lernplan bis zum Test, Karteikarten | Lernmodul |
-| **5 – Google** | Google Kalender + Gmail (Zusammenfassung, Entwürfe) | Echte Daten |
+| **5 – Google + n8n** | Google Kalender, n8n aufsetzen, Gmail-Workflow (Zusammenfassung, Entwürfe) | Echte Daten |
 | **6 – Extras** | Pakete, Geld, Freizeit | Alle Tabs |
 | **7 – Online & Sprache** | Hosting, Handy-Installation, Spracheingabe | Überall nutzbar |
 
 ## 8. Offene Fragen
 
-1. Python oder n8n für den Harness? (Empfehlung: Python)
-2. Soll die App nur für mich sein oder auch für Freunde?
-3. Welche Mail-Adresse und welcher Kalender sollen angebunden werden? (Plan geht von Google aus)
+1. Soll die App nur für mich sein oder auch für Freunde?
+2. Welche Mail-Adresse und welcher Kalender sollen angebunden werden? (Plan geht von Google aus)
 
 ## 9. Datenschutz
 
