@@ -1,7 +1,11 @@
+import json
+import re
 from datetime import date, datetime, time, timedelta
+from html import unescape
 
 import httpx
 
+from app.net import fetch
 from app.tools.base import ToolContext, obj, tool
 
 MEAL_TYPES = ["fruehstueck", "mittag", "abend", "snack"]
@@ -179,6 +183,55 @@ async def naehrwerte_suchen(ctx: ToolContext, args: dict) -> dict:
             }
         )
     return {"treffer": products}
+
+
+def _find_recipe(data) -> dict | None:
+    """Sucht das schema.org-Rezept in den JSON-LD-Daten einer Seite."""
+    if isinstance(data, list):
+        return next((r for r in map(_find_recipe, data) if r), None)
+    if not isinstance(data, dict):
+        return None
+    kind = data.get("@type")
+    if kind == "Recipe" or (isinstance(kind, list) and "Recipe" in kind):
+        return data
+    return _find_recipe(data.get("@graph", []))
+
+
+def parse_recipe(html: str) -> dict:
+    for block in re.findall(
+        r"<script[^>]+application/ld\+json[^>]*>(.*?)</script>", html, re.DOTALL | re.IGNORECASE
+    ):
+        try:
+            recipe = _find_recipe(json.loads(block))
+        except json.JSONDecodeError:
+            continue
+        if recipe:
+            nutrition = recipe.get("nutrition") or {}
+            return {
+                "name": recipe.get("name"),
+                "portionen": recipe.get("recipeYield"),
+                "zutaten": recipe.get("recipeIngredient") or [],
+                "naehrwerte_laut_seite": {
+                    k: v for k, v in nutrition.items() if not k.startswith("@")
+                }
+                or None,
+            }
+    # Kein strukturiertes Rezept: Text der Seite (gekürzt), die KI liest die Zutaten selbst heraus
+    text = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", html, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r"\s+", " ", unescape(re.sub(r"<[^>]+>", " ", text))).strip()
+    return {"seitentext": text[:6000]}
+
+
+@tool(
+    "rezept_lesen",
+    "Liest ein Rezept von einem Link (z. B. Chefkoch, Fooby, Betty Bossi): Name, Portionen, "
+    "Zutaten und – falls angegeben – Nährwerte. Danach Nährwerte pro Portion schätzen; erst "
+    "mit mahlzeit_eintragen speichern, wenn der Nutzer es gegessen hat bzw. das will.",
+    obj({"url": {"type": "string"}}, ["url"]),
+)
+async def rezept_lesen(ctx: ToolContext, args: dict) -> dict:
+    res = await fetch(args["url"])
+    return {"url": str(res.url), **parse_recipe(res.text[:2_000_000])}
 
 
 @tool(

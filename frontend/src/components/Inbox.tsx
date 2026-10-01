@@ -3,21 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { cachedInbox, forgetMail, loadInbox, type Inbox, type Mail } from "@/lib/inbox";
 import { TZ } from "@/lib/format";
-
-type Mail = {
-  id: string;
-  konto: string;
-  konto_label: string | null;
-  von: { name: string; email: string };
-  betreff: string;
-  datum: string | null;
-  gelesen: boolean;
-  newsletter: boolean;
-  kategorie: string | null;
-  antwort_noetig: boolean;
-  vorschau: string;
-};
 
 const CATEGORY: Record<string, { label: string; cls: string }> = {
   persoenlich: { label: "Persönlich", cls: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300" },
@@ -35,7 +22,6 @@ const FILTERS = [
   { key: "werbung", label: "Werbung", match: (m: Mail) => m.kategorie === "werbung" },
 ] as const;
 
-type Inbox = { mails: Mail[]; fehler: { konto: string; fehler: string }[]; konten: string[] };
 type FullMail = Mail & { text: string; an: string };
 
 const COLORS = ["bg-sky-500", "bg-violet-500", "bg-amber-500", "bg-rose-500", "bg-emerald-500"];
@@ -50,14 +36,14 @@ function when(iso: string | null) {
 }
 
 export function Inbox() {
-  const [inbox, setInbox] = useState<Inbox | null>(null);
+  const [inbox, setInbox] = useState<Inbox | null>(cachedInbox);
   const [open, setOpen] = useState<FullMail | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("alle");
 
   useEffect(() => {
-    api<Inbox>("/mail/inbox")
+    loadInbox()
       .then(setInbox)
       .catch((e) => setError(e.message));
   }, []);
@@ -77,6 +63,7 @@ export function Inbox() {
     if (!confirm(`„${mail.betreff}“ in den Papierkorb verschieben?`)) return;
     try {
       await api(`/mail/message/${encodeURIComponent(mail.id)}`, { method: "DELETE" });
+      forgetMail(mail.id);
       setInbox((box) => box && { ...box, mails: box.mails.filter((m) => m.id !== mail.id) });
       setOpen(null);
     } catch (e) {
@@ -120,6 +107,11 @@ export function Inbox() {
             </button>
           ))}
         </div>
+        {inbox.aussortiert > 0 && (
+          <p className="border-b border-border px-3 py-2 text-xs text-muted">
+            🧹 {inbox.aussortiert} Werbe-Mail{inbox.aussortiert === 1 ? "" : "s"} automatisch in den Papierkorb verschoben
+          </p>
+        )}
         {inbox.fehler.map((f) => (
           <p key={f.konto} className="border-b border-border px-3 py-2 text-xs text-red-500">
             {f.konto}: {f.fehler}

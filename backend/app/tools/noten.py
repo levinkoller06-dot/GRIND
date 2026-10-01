@@ -120,8 +120,7 @@ async def noten_abfragen(ctx: ToolContext, args: dict) -> dict:
 
 @tool(
     "test_anlegen",
-    "Legt einen Test / eine Klassenarbeit an und schlägt den passenden Kalendertermin vor "
-    "(der Termin muss vom Nutzer bestätigt werden).",
+    "Legt einen Test / eine Klassenarbeit an und trägt den passenden Kalendertermin ein.",
     obj(
         {
             "fach": {"type": "string"},

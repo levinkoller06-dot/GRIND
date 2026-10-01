@@ -26,6 +26,8 @@ class FakeDb:
             op, _, expected = value.partition(".")
             if op == "eq" and str(row.get(key)) != expected:
                 return False
+            if op == "like" and not str(row.get(key) or "").startswith(expected.rstrip("*")):
+                return False
             if op == "ilike" and str(row.get(key, "")).lower() != expected.lower():
                 return False
         return True

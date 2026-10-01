@@ -61,8 +61,8 @@ async def mails_abfragen(ctx: ToolContext, args: dict) -> dict:
 
 @tool(
     "mails_loeschen",
-    "Schlägt vor, Mails in den Papierkorb zu verschieben (z. B. Werbung, Spam, alle von einem "
-    "Absender). Der Nutzer muss bestätigen. IDs vorher mit mails_abfragen (kompakt) holen.",
+    "Verschiebt Mails in den Papierkorb (z. B. Werbung, Spam, alle von einem Absender). "
+    "IDs vorher mit mails_abfragen (kompakt) holen und unverändert übernehmen.",
     obj(
         {
             "ids": {"type": "array", "items": {"type": "string"}},
@@ -70,27 +70,36 @@ async def mails_abfragen(ctx: ToolContext, args: dict) -> dict:
                 "type": "string",
                 "description": "Kurz, z. B. 'Werbung' oder 'alle von Google'",
             },
+            "ausser_absender": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Absender, die nie gelöscht werden sollen (z. B. ['Digitec', 'Twint'])",
+            },
         },
         ["ids"],
     ),
 )
 async def mails_loeschen(ctx: ToolContext, args: dict) -> dict:
-    ids = list(dict.fromkeys(args["ids"]))
-    if not ids:
-        raise ValueError("Keine Mails angegeben")
-    # Absender/Betreff für die Bestätigungs-Karte aus dem Zwischenspeicher holen
+    # Absender/Betreff aus dem Zwischenspeicher – unbekannte (z. B. verstümmelte) IDs fallen weg
     known = {m["id"]: m for _, mails in service._cache.values() for m in mails}
-    preview = [
-        {
-            "von": known[i]["von"]["name"] if i in known else "?",
-            "betreff": known[i]["betreff"] if i in known else i,
-        }
-        for i in ids
-    ]
+    keep = [k.strip().lower() for k in args.get("ausser_absender") or [] if k.strip()]
+
+    def excluded(m: dict) -> bool:
+        sender = f"{m['von']['name']} {m['von']['email']}".lower()
+        return any(k in sender for k in keep)
+
+    wanted = list(dict.fromkeys(args["ids"]))
+    ids = [i for i in wanted if i in known and not excluded(known[i])]
+    if not ids:
+        raise ValueError("Keine gültigen Mail-IDs – erst mails_abfragen (kompakt) aufrufen")
+    preview = [{"von": known[i]["von"]["name"], "betreff": known[i]["betreff"]} for i in ids]
     payload = {"ids": ids, "anzahl": len(ids), "grund": args.get("grund"), "vorschau": preview}
-    return await propose(
+    result = await propose(
         ctx, "mail.delete", payload, f"{len(ids)} Mail(s) in den Papierkorb verschieben."
     )
+    if skipped := len(wanted) - len(ids):
+        result["uebersprungen"] = f"{skipped} Mail(s) nicht gelöscht (Ausnahme oder unbekannte ID)"
+    return result
 
 
 @tool(
@@ -106,8 +115,8 @@ async def mail_lesen(ctx: ToolContext, args: dict) -> dict:
 
 @tool(
     "mail_senden",
-    "Schreibt eine Mail oder Antwort. Sie wird NICHT sofort gesendet, sondern dem Nutzer zum "
-    "Bestätigen vorgelegt. Für Antworten antwort_auf_id angeben (Betreff/Empfänger kommen dann "
+    "Schreibt und sendet eine Mail oder Antwort (je nach Einstellung erst nach Bestätigung). "
+    "Für Antworten antwort_auf_id angeben (Betreff/Empfänger kommen dann "
     "von der Original-Mail).",
     obj(
         {

@@ -97,3 +97,58 @@ def test_vorauswahl_faellt_auf_alle_tools_zurueck(monkeypatch):
     assert run(router.select_groups("hallo", [], False)) is None
     assert len(router.declarations(None)) == len(router.REGISTRY)
     assert jev.enabled()
+
+
+def test_nur_sichere_werbung_wird_aussortiert(monkeypatch):
+    from app.mail import service
+
+    classify._cache.clear()
+    classify._sure_ads.clear()
+    service._cache.clear()
+    fake_jev(
+        monkeypatch,
+        lambda body: {
+            "k0": {"choice": "werbung", "probabilities": {"werbung": 0.97}},
+            "a0": {"noul": 0.0},
+            "k1": {"choice": "werbung", "probabilities": {"werbung": 0.55}},
+            "a1": {"noul": 0.0},
+            "k2": {"choice": "persoenlich", "probabilities": {"persoenlich": 1}},
+            "a2": {"noul": 0.9},
+        },
+    )
+    mails = [mail(1, "Zalando", "-50%"), mail(2, "Verein", "Infos"), mail(3, "Tim", "Kino?")]
+    trashed = []
+
+    async def fake_accounts(db, konto=None):
+        return [type("Acc", (), {"id": "a", "email": "ich@x.ch"})()]
+
+    async def fake_trash(db, ids):
+        trashed.extend(ids)
+
+    monkeypatch.setattr(service, "_accounts", fake_accounts)
+    monkeypatch.setattr(
+        service.imap, "list_messages", lambda *a: ("fp", [{**m, "datum": None} for m in mails])
+    )
+    monkeypatch.setattr(service, "trash", fake_trash)
+
+    result = run(service.inbox(None))
+    assert trashed == ["a:1"]  # unsichere Werbung (55 %) bleibt liegen
+    assert result["aussortiert"] == 1
+    assert [m["id"] for m in result["mails"]] == ["a:2", "a:3"]
+    assert all(m["id"] != "a:1" for m in next(iter(service._cache.values()))[1])
+
+    monkeypatch.setattr(get_settings(), "mail_auto_trash_ads", False)
+    trashed.clear()
+    service._cache.clear()
+    assert run(service.inbox(None))["aussortiert"] == 0 and trashed == []
+    classify._cache.clear()
+    classify._sure_ads.clear()
+    service._cache.clear()
+
+
+def test_ersatzregel_loescht_nie_automatisch():
+    classify._cache.clear()
+    classify._sure_ads.clear()
+    mails = [mail(1, "Shop", "Sale", newsletter=True)]
+    run(classify.annotate(mails))
+    assert mails[0]["kategorie"] == "werbung" and classify.sure_ads(mails) == []

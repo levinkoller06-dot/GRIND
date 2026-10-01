@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     # Jev (TypeSafe AI) über OpenRouter – schnelle Entscheidungen (Kategorien, Tool-Auswahl)
     openrouter_api_key: str = ""
     jev_model: str = "typesafe/jev-1.13"
+    # Von Jev sicher erkannte Werbung ohne Nachfrage in den Papierkorb verschieben
+    mail_auto_trash_ads: bool = True
+    # Termine, Mails senden/löschen erst nach Bestätigung in der App ausführen (false = sofort)
+    confirm_actions: bool = False
 
     # Schlüssel zum Verschlüsseln von Mail-Passwörtern (Fernet)
     encryption_key: str = ""

@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { TABS } from "@/components/tabs";
+import { eventMinutes, eventStyle, eventTooltip, time, type CalEvent } from "@/lib/events";
 import { createClient } from "@/lib/supabase/server";
-import { KIND_ICON, TZ, dayEnd, dayStart, todayIso } from "@/lib/format";
+import { KIND_ICON, dayEnd, dayStart, todayIso } from "@/lib/format";
 import {
   WEEKDAYS_SHORT,
   addDays,
@@ -15,29 +16,6 @@ import {
 } from "@/lib/week";
 
 const tab = TABS.find((t) => t.href === "/kalender")!;
-
-type Event = {
-  id: string;
-  title: string;
-  starts_at: string;
-  ends_at: string | null;
-  all_day: boolean;
-  kind: string;
-  notes: string | null;
-  location: string | null;
-  participants: string[] | null;
-};
-
-const KIND_STYLE: Record<string, string> = {
-  test: "bg-red-500/15 border-red-500 text-red-700 dark:text-red-300",
-  schule: "bg-blue-500/15 border-blue-500 text-blue-700 dark:text-blue-300",
-  geburtstag: "bg-pink-500/15 border-pink-500 text-pink-700 dark:text-pink-300",
-  termin: "bg-accent/20 border-accent text-foreground",
-  sonstiges: "bg-surface-2 border-muted text-foreground",
-};
-
-const time = (iso: string) =>
-  new Date(iso).toLocaleTimeString("de-DE", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
 
 export default async function KalenderPage({ searchParams }: PageProps<"/kalender">) {
   // Nur diese, letzte und nächste Woche
@@ -53,16 +31,11 @@ export default async function KalenderPage({ searchParams }: PageProps<"/kalende
     .gte("starts_at", dayStart(days[0]))
     .lte("starts_at", dayEnd(days[6]))
     .order("starts_at");
-  const events = (data ?? []) as Event[];
+  const events = (data ?? []) as CalEvent[];
 
   const timed = events
     .filter((e) => !e.all_day)
-    .map((e) => {
-      const start = minutesOfDay(e.starts_at);
-      const end =
-        e.ends_at && dayKey(e.ends_at) === dayKey(e.starts_at) ? minutesOfDay(e.ends_at) : start + 60;
-      return { ...e, day: dayKey(e.starts_at), start, end: Math.max(end, start + 30) };
-    });
+    .map((e) => ({ ...e, day: dayKey(e.starts_at), ...eventMinutes(e) }));
 
   // Sichtbarer Bereich: 7–21 Uhr, bei Bedarf erweitert. Positionen in Prozent,
   // damit das Raster immer genau in den Bildschirm passt.
@@ -140,7 +113,7 @@ export default async function KalenderPage({ searchParams }: PageProps<"/kalende
                       <div
                         key={e.id}
                         title={[e.title, e.location, e.notes].filter(Boolean).join(" · ")}
-                        className={`truncate rounded border-l-2 px-1 text-[11px] font-medium ${KIND_STYLE[e.kind] ?? KIND_STYLE.termin}`}
+                        className={`truncate rounded border-l-2 px-1 text-[11px] font-medium ${eventStyle(e)}`}
                       >
                         {KIND_ICON[e.kind]} {e.title}
                       </div>
@@ -170,16 +143,8 @@ export default async function KalenderPage({ searchParams }: PageProps<"/kalende
                 {layoutDay(timed.filter((e) => e.day === d)).map((e) => (
                   <div
                     key={e.id}
-                    title={[
-                      e.title,
-                      `${time(e.starts_at)}${e.ends_at ? `–${time(e.ends_at)}` : ""}`,
-                      e.location && `📍 ${e.location}`,
-                      e.participants?.length && `👥 ${e.participants.join(", ")}`,
-                      e.notes,
-                    ]
-                      .filter(Boolean)
-                      .join("\n")}
-                    className={`absolute overflow-hidden rounded-md border-l-2 px-1 py-0.5 text-[11px] leading-tight ${KIND_STYLE[e.kind] ?? KIND_STYLE.termin}`}
+                    title={eventTooltip(e)}
+                    className={`cal-event absolute overflow-hidden rounded-md border-l-2 px-1 py-0.5 text-[11px] leading-tight ${eventStyle(e)}`}
                     style={{
                       top: `calc(${pct(e.start)} + 1px)`,
                       height: `calc(${((e.end - e.start) / total) * 100}% - 2px)`,
@@ -188,13 +153,16 @@ export default async function KalenderPage({ searchParams }: PageProps<"/kalende
                       width: `calc(${100 / e.lanes}% - 4px)`,
                     }}
                   >
-                    <div className="truncate font-semibold">{e.title}</div>
-                    <div className="truncate opacity-80">
+                    <div className="truncate">
+                      <span className="font-semibold">{e.title}</span>
+                      <span className="cal-inline-time opacity-80"> · {time(e.starts_at)}</span>
+                    </div>
+                    <div className="cal-second-line truncate opacity-80">
                       {time(e.starts_at)}
                       {e.location && ` · 📍 ${e.location}`}
                     </div>
                     {e.participants && e.participants.length > 0 && (
-                      <div className="truncate opacity-80">👥 {e.participants.join(", ")}</div>
+                      <div className="cal-people truncate opacity-80">👥 {e.participants.join(", ")}</div>
                     )}
                   </div>
                 ))}

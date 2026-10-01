@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/login/actions";
 import { SCALE_LABEL, type GradeScale } from "@/lib/grades";
 import { MailAccounts } from "@/components/MailAccounts";
+import { MoodleConnect } from "@/components/MoodleConnect";
 import { saveProfile } from "./actions";
 
 export default async function EinstellungenPage() {
@@ -67,6 +68,7 @@ export default async function EinstellungenPage() {
       </section>
 
       <MailAccounts />
+      <MoodleConnect />
     </div>
   );
 }

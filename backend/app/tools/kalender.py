@@ -30,8 +30,8 @@ def describe(payload: dict) -> str:
 
 @tool(
     "termin_vorschlagen",
-    "Schlägt einen Kalendertermin vor. Der Termin wird erst eingetragen, wenn der Nutzer "
-    "bestätigt. Für Tests/Klassenarbeiten stattdessen test_anlegen verwenden.",
+    "Trägt einen Kalendertermin ein (je nach Einstellung erst nach Bestätigung des Nutzers). "
+    "Für Tests/Klassenarbeiten stattdessen test_anlegen verwenden.",
     obj(
         {
             "titel": {"type": "string", "description": "Kurzer Titel, z. B. 'Zahnarzt'"},
@@ -76,7 +76,7 @@ async def termine_abfragen(ctx: ToolContext, args: dict) -> dict:
     end = date.fromisoformat(args.get("bis") or (today + timedelta(days=14)).isoformat())
     rows = await ctx.db.select(
         "events",
-        select="id,title,starts_at,ends_at,all_day,kind,location,participants",
+        select="id,title,starts_at,ends_at,all_day,kind,location,participants,notes",
         order="starts_at",
         **{
             "starts_at": f"gte.{datetime.combine(start, time.min, ctx.tz).isoformat()}",
@@ -88,7 +88,7 @@ async def termine_abfragen(ctx: ToolContext, args: dict) -> dict:
 
 @tool(
     "termin_loeschen",
-    "Schlägt vor, einen Termin zu löschen (der Nutzer muss bestätigen). Die ID vorher mit "
+    "Löscht einen Termin (je nach Einstellung erst nach Bestätigung). Die ID vorher mit "
     "termine_abfragen herausfinden. Gehört der Termin zu einem Test, wird der Test mitgelöscht.",
     obj({"id": {"type": "string", "description": "ID aus termine_abfragen"}}, ["id"]),
 )

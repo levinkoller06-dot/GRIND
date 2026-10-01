@@ -96,22 +96,37 @@ export function Chat() {
   }
 
   return (
-    <section className="flex h-[70dvh] flex-col rounded-2xl border border-border bg-surface p-4 md:h-full md:min-h-0">
-      <h2 className="mb-3 font-bold">🧠 Gehirn</h2>
+    <section className="flex h-[70dvh] flex-col rounded-2xl border bg-surface p-5 md:h-full md:min-h-0">
+      <header className="mb-4 flex items-center justify-between">
+        <div>
+          <h2 className="flex items-center gap-2 text-lg font-bold tracking-tight">
+            <span className="relative flex size-2.5">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-accent opacity-60" />
+              <span className="relative inline-flex size-2.5 rounded-full bg-accent" />
+            </span>
+            GRIND AI
+          </h2>
+          <p className="text-xs text-muted">Dein smarter Assistent</p>
+        </div>
+        <span
+          aria-hidden
+          className={`size-9 rounded-full bg-[radial-gradient(circle_at_35%_30%,#f7fee7,#bef264_45%,#65a30d)] shadow-[0_0_24px_-2px_var(--glow)] transition-transform duration-700 ${busy ? "scale-110 animate-pulse" : ""}`}
+        />
+      </header>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
         {messages.length === 0 && !busy && (
-          <div className="rounded-xl bg-surface-2 p-3 text-sm text-muted">
+          <div className="msg-in rounded-2xl bg-surface-2/70 p-4 text-sm text-muted">
             Schreib einfach, was ansteht. Ich sortiere es für dich ein.
           </div>
         )}
         {messages.map((m, i) => (
           <div
             key={m.id ?? `local-${i}`}
-            className={`selectable max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm ${
+            className={`msg-in selectable max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-[var(--shadow)] ${
               m.role === "user"
-                ? "self-end rounded-br-sm bg-accent text-accent-fg"
-                : "self-start rounded-bl-sm bg-surface-2"
+                ? "self-end rounded-br-md bg-accent/20 text-foreground"
+                : "self-start rounded-bl-md bg-[var(--glass-strong)]"
             }`}
           >
             {m.image && (
@@ -122,8 +137,10 @@ export function Chat() {
           </div>
         ))}
         {busy && (
-          <div className="self-start rounded-2xl rounded-bl-sm bg-surface-2 px-3 py-2 text-sm text-muted">
-            denkt nach …
+          <div className="msg-in typing self-start rounded-2xl rounded-bl-md bg-[var(--glass-strong)] px-4 py-3 text-muted shadow-[var(--shadow)]" aria-label="denkt nach">
+            <span />
+            <span />
+            <span />
           </div>
         )}
         {pending.map((a) =>
@@ -146,7 +163,7 @@ export function Chat() {
             <button
               key={ex}
               onClick={() => send(ex)}
-              className="rounded-full border border-border px-3 py-1 text-xs text-muted hover:bg-surface-2"
+              className="rounded-full border border-border bg-[var(--glass)] px-3 py-1.5 text-xs text-muted transition hover:-translate-y-0.5 hover:border-accent hover:text-foreground"
             >
               {ex}
             </button>
@@ -169,7 +186,7 @@ export function Chat() {
           e.preventDefault();
           send(input);
         }}
-        className="mt-3 flex gap-2"
+        className="mt-4 flex items-center gap-2 rounded-2xl border border-border bg-[var(--glass-strong)] p-1.5 pl-2 shadow-[var(--shadow)] transition focus-within:border-accent focus-within:shadow-[0_0_0_4px_var(--glow)]"
       >
         <input
           ref={fileInput}
@@ -185,7 +202,7 @@ export function Chat() {
         <button
           type="button"
           onClick={() => fileInput.current?.click()}
-          className="rounded-xl border border-border px-3 text-lg hover:bg-surface-2"
+          className="grid size-10 shrink-0 place-items-center rounded-xl text-lg transition hover:bg-surface-2"
           aria-label="Foto vom Essen"
           title="Foto vom Essen"
         >
@@ -194,15 +211,15 @@ export function Chat() {
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={image ? "Was ist drauf? (optional)" : "Schreib dem Gehirn …"}
-          className="min-w-0 flex-1 rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-accent"
+          placeholder={image ? "Was ist drauf? (optional)" : "Nachricht an GRIND AI …"}
+          className="min-w-0 flex-1 bg-transparent px-2 py-2.5 text-sm outline-none"
         />
         <button
           disabled={busy || (!input.trim() && !image)}
-          className="rounded-xl bg-accent px-4 font-bold text-accent-fg disabled:opacity-50"
+          className="glow-button grid size-11 shrink-0 place-items-center rounded-full bg-accent text-lg font-bold text-accent-fg disabled:opacity-40"
           aria-label="Senden"
         >
-          ➤
+          ↑
         </button>
       </form>
     </section>

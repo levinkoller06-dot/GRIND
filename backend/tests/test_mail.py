@@ -152,6 +152,52 @@ def test_mails_loeschen_nur_mit_bestaetigung(monkeypatch):
     service._cache.clear()
 
 
+def test_ohne_bestaetigung_sofort_geloescht_mit_ausnahmen(monkeypatch):
+    monkeypatch.setattr(get_settings(), "confirm_actions", False)
+    trashed = []
+
+    async def fake_trash(db, ids):
+        trashed.extend(ids)
+        return {"in_papierkorb": len(ids)}
+
+    monkeypatch.setattr(service, "trash", fake_trash)
+    service._cache[("acc-1", 30, 150, False)] = (
+        "fp",
+        [
+            {
+                "id": "acc-1:7",
+                "von": {"name": "Zalando", "email": "news@zalando.ch"},
+                "betreff": "-50%",
+            },
+            {
+                "id": "acc-1:8",
+                "von": {"name": "Digitec", "email": "info@digitec.ch"},
+                "betreff": "Login",
+            },
+        ],
+    )
+    db = FakeDb()
+    args = {"ids": ["acc-1:7", "acc-1:8", "acc-1-kaputt..."], "ausser_absender": ["Digitec"]}
+    llm = FakeLlm(calls(("mails_loeschen", args)), text("Erledigt, 1 Mail gelöscht."))
+    result = run(harness.chat(db, llm, "Lösch alles ausser Digitec"))
+    assert result["pending"] == []  # keine Bestätigungs-Karte
+    assert trashed == ["acc-1:7"]  # Digitec und die kaputte ID bleiben verschont
+    assert db.tables["pending_actions"][0]["status"] == "confirmed"
+    service._cache.clear()
+
+
+def test_kaputte_id_blockiert_den_rest_nicht(monkeypatch):
+    moved = []
+    monkeypatch.setattr(service, "_account_by_id", lambda db, a: asyncio.sleep(0, ACC))
+    monkeypatch.setattr(imap, "move_to_trash", lambda acc, uids: moved.extend(uids) or len(uids))
+    assert run(service.trash(None, ["acc-1:5", "a9f441ea-c767-4833-app..."])) == {
+        "in_papierkorb": 1
+    }
+    assert moved == ["5"]
+    with pytest.raises(imap.MailError):
+        run(service.trash(None, ["kaputt"]))
+
+
 def test_newsletter_erkennung():
     msg = EmailMessage()
     msg["From"] = "Shop <news@shop.ch>"

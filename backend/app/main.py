@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from app import actions, harness, suggestions
+from app import actions, harness, moodle, suggestions
 from app.auth import UserDep
 from app.config import Settings, get_settings
 from app.db import Db, DbError
@@ -42,6 +42,11 @@ async def db_error(_: Request, exc: DbError) -> JSONResponse:
 
 @app.exception_handler(MailError)
 async def mail_error(_: Request, exc: MailError) -> JSONResponse:
+    return JSONResponse({"detail": str(exc)}, status_code=400)
+
+
+@app.exception_handler(moodle.MoodleError)
+async def moodle_error(_: Request, exc: moodle.MoodleError) -> JSONResponse:
     return JSONResponse({"detail": str(exc)}, status_code=400)
 
 
@@ -178,6 +183,31 @@ async def mail_message(mail_id: str, db: DbDep) -> dict:
 async def trash_mail_message(mail_id: str, db: DbDep) -> dict:
     # Direkter Klick des Nutzers im Mails-Tab = Bestätigung
     return await mail_service.trash(db, [mail_id])
+
+
+class MoodleIn(BaseModel):
+    url: str = Field(min_length=10, max_length=1000)
+
+
+@app.get("/moodle")
+async def moodle_status(db: DbDep) -> dict:
+    return await moodle.status(db)
+
+
+@app.put("/moodle")
+async def moodle_connect(body: MoodleIn, db: DbDep) -> dict:
+    return await moodle.connect(db, body.url)
+
+
+@app.delete("/moodle")
+async def moodle_disconnect(db: DbDep) -> dict:
+    await moodle.disconnect(db)
+    return {"verbunden": False}
+
+
+@app.post("/moodle/sync")
+async def moodle_sync(db: DbDep, force: bool = False) -> dict:
+    return await moodle.sync(db, force)
 
 
 @app.get("/pending")

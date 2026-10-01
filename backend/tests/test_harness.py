@@ -232,7 +232,7 @@ def test_modell_kette_bei_aufgebrauchtem_kontingent(monkeypatch):
 
     calls_made = []
 
-    async def fake_post(self, url, json=None, headers=None):
+    async def fake_post(self, url, json=None, headers=None, timeout=None):
         model = url.split("/models/")[1].split(":")[0]
         calls_made.append(model)
         request = httpx.Request("POST", url)
@@ -263,7 +263,7 @@ def test_alle_modelle_aufgebraucht(monkeypatch):
 
     from app import llm as llm_module
 
-    async def fake_post(self, url, json=None, headers=None):
+    async def fake_post(self, url, json=None, headers=None, timeout=None):
         return httpx.Response(429, text="PerDay", request=httpx.Request("POST", url))
 
     monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
@@ -271,3 +271,20 @@ def test_alle_modelle_aufgebraucht(monkeypatch):
     with pytest.raises(llm_module.LlmError, match="aufgebraucht"):
         run(llm_module.Gemini("key", ["a", "b"]).generate("s", [], []))
     llm_module._exhausted.clear()
+
+
+def test_termin_ohne_bestaetigung_direkt_eingetragen(monkeypatch):
+    from app.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "confirm_actions", False)
+    db = FakeDb()
+    llm = FakeLlm(
+        calls(
+            ("termin_vorschlagen", {"titel": "Zahnarzt", "datum": "2026-10-02", "uhrzeit": "15:00"})
+        ),
+        text("Eingetragen!"),
+    )
+    result = run(harness.chat(db, llm, "Morgen 15 Uhr Zahnarzt"))
+    assert result["pending"] == []
+    assert db.tables["events"][0]["title"] == "Zahnarzt"
+    assert "ohne nachzufragen" in harness.actions_rule()

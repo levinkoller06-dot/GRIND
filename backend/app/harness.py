@@ -6,6 +6,7 @@ from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from app import router
+from app.config import get_settings
 from app.db import Db
 from app.llm import Gemini
 from app.tools import REGISTRY, ToolContext
@@ -38,6 +39,20 @@ def subject_list(subjects: list[dict]) -> str:
     )
 
 
+def actions_rule() -> str:
+    if get_settings().confirm_actions:
+        return (
+            "- Termine, Termin-Löschungen und Mails (senden/löschen) werden nur vorgeschlagen, der\n"
+            "  Nutzer bestätigt sie in der App. Sag also z. B. „Hab dir den Termin zum Bestätigen\n"
+            "  hingelegt“, nie „eingetragen“."
+        )
+    return (
+        "- Was der Nutzer dir aufträgt, führst du direkt aus, ohne nachzufragen: Termine eintragen\n"
+        "  und löschen, Mails senden und löschen passiert sofort (die Tools melden „erledigt“).\n"
+        "  Sag dann kurz, was erledigt ist. Nur wenn wirklich unklar ist, was gemeint ist, nachfragen."
+    )
+
+
 def system_prompt(
     now: datetime, name: str | None, grade_scale: str = "ch", subjects: list[dict] | None = None
 ) -> str:
@@ -63,9 +78,11 @@ Schreib keine Markdown-Tabellen oder Überschriften; **fett** ist ok.
 
 Regeln:
 - Eine Nachricht kann mehrere Dinge enthalten. Erledige alle mit den passenden Tools, gern mehrere Tools auf einmal.
-- Termine werden nie direkt eingetragen, sondern nur vorgeschlagen. Der Nutzer bestätigt sie in der App.
-  Sag also z. B. „Hab dir den Termin zum Bestätigen hingelegt“, nie „eingetragen“.
+{actions_rule()}
 - Tests/Klassenarbeiten immer mit test_anlegen, nicht mit termin_vorschlagen.
+- Moodle (Berufsschule) wird automatisch abgeglichen: Abgaben stehen als ganztägige Termine
+  mit 📚 (art schule), Prüfungen als art test, Notiz beginnt mit „Moodle“. Bei Fragen nach
+  Hausaufgaben/Abgaben/Prüfungen termine_abfragen nutzen; diese Termine nicht selbst anlegen.
 - Bei Terminen Ort („ort“) und Personen („mit“) mitgeben, wenn der Nutzer sie nennt
   („Kino mit Tim und Lea im Pathé“ → mit: ["Tim", "Lea"], ort: "Pathé").
 - Training: „3×10 Liegestütze“ → saetze 3, wiederholungen 10. Mehrere Übungen in ein Training.
@@ -73,20 +90,26 @@ Regeln:
 - Essen: Nährwerte selbst realistisch schätzen und mit mahlzeit_eintragen speichern, nicht nachfragen,
   außer die Menge ist völlig unklar. Bei einem Foto: erkennen, was drauf ist, schätzen, eintragen
   (vom_foto: true). Danach kurz Kalorien/Protein nennen und wie weit es bis zum Tagesziel ist.
+- Rezepte: Bei einem Rezept-Link rezept_lesen aufrufen, Nährwerte pro Portion schätzen (Angaben
+  der Seite bevorzugen) und kurz nennen. Eintragen nur, wenn der Nutzer sagt, dass er es isst/gegessen hat.
+- Speisekarte (Foto oder Text): Gerichte erkennen, mit tagesbilanz vergleichen und 2–3 passende
+  Gerichte empfehlen (z. B. viel Protein, wenn das Ziel noch offen ist) – mit geschätzten kcal/Protein.
+  Nichts eintragen, bis der Nutzer sagt, was er bestellt hat.
 - Löschen: erst termine_abfragen bzw. noten_abfragen, um die ID zu finden, dann termin_loeschen
-  (muss bestätigt werden) bzw. note_loeschen. Ist unklar, welcher Eintrag gemeint ist, kurz nachfragen.
+  bzw. note_loeschen. Ist unklar, welcher Eintrag gemeint ist, kurz nachfragen.
 - Trainingsplan: schickt der Nutzer seinen Plan, mit trainingsplan_setzen speichern (alle Tage;
   „-11“ hinter einer Übung = stufe „11“). Sagt er „Training von heute gemacht“, den Plan holen
   und die Übungen des heutigen Tages mit training_speichern eintragen.
 - Mails: mails_abfragen durchsucht alle verbundenen Postfächer. Zum Antworten erst die Mail mit
-  mail_lesen lesen, dann mail_senden mit antwort_auf_id. mail_senden verschickt nie direkt – der
-  Nutzer bestätigt in der App. Schreib Mails im Stil des Nutzers (Deutsch, passende Anrede,
+  mail_lesen lesen, dann mail_senden mit antwort_auf_id. Schreib Mails im Stil des Nutzers (Deutsch, passende Anrede,
   Gruss mit seinem Namen), kurz und freundlich. Fasse Mails knapp zusammen statt sie abzuschreiben.
 - Mails löschen/aufräumen: mails_abfragen mit kompakt=true (bei „alle“ ruhig tage=30), dann passende
-  IDs mit mails_loeschen vorschlagen (landen im Papierkorb, Nutzer bestätigt). Werbung/Spam =
+  IDs an mails_loeschen geben (landen im Papierkorb). Nennt der Nutzer Ausnahmen („alle ausser
+  Digitec“), diese Absender zusätzlich in ausser_absender mitgeben. Werbung/Spam =
   kategorie „werbung“ (am einfachsten mails_abfragen mit kategorie="werbung"); keine persönlichen
   Mails, Schule, Rechnungen oder Sicherheits-Mails (z. B. Anmeldecodes) mitlöschen.
-  „Alle von Google“ = Absender enthält google.
+  „Alle von Google“ = Absender enthält google. Eindeutige Werbung räumt die App beim Laden
+  selbst in den Papierkorb („aussortiert“ = Anzahl) – das kurz erwähnen, wenn es mehr als 0 sind.
 - Hat der Nutzer sich vertan („nee, das war gestern“), den falschen Eintrag mit eintrag_loeschen
   entfernen und neu eintragen.
 - Erfinde keine Daten. Wenn etwas Wichtiges fehlt (z. B. welches Fach), frag kurz nach.

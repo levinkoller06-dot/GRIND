@@ -16,7 +16,7 @@ GROUPS = {
     "kalender": "Termine, Kalender, Verabredungen, Geburtstage (eintragen, abfragen, löschen)",
     "noten": "Schule: Noten, Fächer, Tests und Prüfungen",
     "gym": "Sport: Training, Übungen, Trainingsplan, Rekorde",
-    "essen": "Essen: Mahlzeiten, Kalorien, Protein, Ernährungsziele",
+    "essen": "Essen: Mahlzeiten, Kalorien, Protein, Ernährungsziele, Rezepte, Speisekarten",
     "mails": "E-Mails: lesen, suchen, zusammenfassen, beantworten, schreiben, löschen",
 }
 

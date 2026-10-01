@@ -106,3 +106,35 @@ def test_training_aus_chat():
     )
     assert run(harness.chat(db, llm, "3x10 Liegestütze"))["tools"] == ["training_speichern"]
     assert db.tables["workout_entries"][0]["reps"] == 10
+
+
+def test_rezept_aus_json_ld():
+    from app.tools.essen import parse_recipe
+
+    html = """<html><head><script type="application/ld+json">
+    {"@context": "https://schema.org", "@graph": [{"@type": "WebPage"},
+     {"@type": ["Recipe"], "name": "Älplermagronen", "recipeYield": "4 Portionen",
+      "recipeIngredient": ["400 g Hörnli", "200 g Kartoffeln"],
+      "nutrition": {"@type": "NutritionInformation", "calories": "650 kcal"}}]}
+    </script></head><body>…</body></html>"""
+    recipe = parse_recipe(html)
+    assert recipe["name"] == "Älplermagronen"
+    assert recipe["zutaten"] == ["400 g Hörnli", "200 g Kartoffeln"]
+    assert recipe["naehrwerte_laut_seite"] == {"calories": "650 kcal"}
+
+
+def test_rezept_ohne_json_ld_liefert_text():
+    from app.tools.essen import parse_recipe
+
+    recipe = parse_recipe("<p>Zutaten: 2 Eier &amp; Speck</p><script>x()</script>")
+    assert recipe == {"seitentext": "Zutaten: 2 Eier & Speck"}
+
+
+def test_rezept_link_ins_eigene_netz_verboten():
+    import pytest
+
+    from app.net import public_url
+
+    for url in ["http://localhost:8000/me", "http://192.168.1.1", "file:///etc/passwd"]:
+        with pytest.raises(ValueError):
+            public_url(url)

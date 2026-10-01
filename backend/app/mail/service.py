@@ -1,10 +1,15 @@
 """Gemeinsames Postfach über alle Mail-Konten eines Nutzers."""
 
 import asyncio
+import imaplib
+import logging
 
+from app.config import get_settings
 from app.db import Db
 from app.mail import classify, imap
 from app.mail.crypto import decrypt, encrypt
+
+log = logging.getLogger(__name__)
 
 # Zwischenspeicher pro Konto: (Konto, Tage, Limit, nur ungelesen) → (Fingerabdruck, Mails)
 _cache: dict[tuple, tuple[str, list[dict]]] = {}
@@ -121,7 +126,34 @@ async def inbox(
         ]
     mails.sort(key=lambda m: m["datum"] or "", reverse=True)
     await classify.annotate(mails)
-    return {"mails": mails, "fehler": errors, "konten": [a.email for a in accounts]}
+    removed = await _trash_ads(db, mails)
+    if removed:
+        mails = [m for m in mails if m["id"] not in removed]
+    return {
+        "mails": mails,
+        "fehler": errors,
+        "konten": [a.email for a in accounts],
+        "aussortiert": len(removed),
+    }
+
+
+async def _trash_ads(db: Db, mails: list[dict]) -> set[str]:
+    """Verschiebt von Jev sicher erkannte Werbung ohne Nachfrage in den Papierkorb."""
+    if not get_settings().mail_auto_trash_ads:
+        return set()
+    ids = classify.sure_ads(mails)
+    if not ids:
+        return set()
+    try:
+        await trash(db, ids)
+    except (imap.MailError, imaplib.IMAP4.error, OSError) as e:
+        log.warning("Werbung automatisch aussortieren fehlgeschlagen: %s", e)
+        return set()
+    removed = set(ids)
+    for key, (fp, cached) in _cache.items():
+        _cache[key] = (fp, [m for m in cached if m["id"] not in removed])
+    log.info("%d Werbe-Mails automatisch in den Papierkorb verschoben", len(removed))
+    return removed
 
 
 def _split_id(mail_id: str) -> tuple[str, str]:
@@ -147,7 +179,12 @@ async def trash(db: Db, mail_ids: list[str]) -> dict:
     """Verschiebt Mails (auch aus mehreren Konten) in den jeweiligen Papierkorb."""
     by_account: dict[str, list[str]] = {}
     for mail_id in mail_ids:
-        account_id, uid = _split_id(mail_id)
+        try:
+            account_id, uid = _split_id(mail_id)
+        except imap.MailError:
+            if len(mail_ids) == 1:
+                raise
+            continue  # eine kaputte ID soll nicht alle anderen blockieren
         by_account.setdefault(account_id, []).append(uid)
     moved = 0
     for account_id, uids in by_account.items():

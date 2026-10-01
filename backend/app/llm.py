@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import time
 from datetime import datetime, timedelta
 from typing import Any
@@ -9,6 +10,10 @@ import httpx
 
 API = "https://generativelanguage.googleapis.com/v1beta/models"
 TIMEOUT = httpx.Timeout(45, connect=10)
+# Gibt es noch ein Ersatzmodell, nicht ewig warten: lieber schnell zum nächsten wechseln
+FALLBACK_TIMEOUT = httpx.Timeout(12, connect=5)
+
+log = logging.getLogger(__name__)
 
 # Modelle, deren Tageskontingent aufgebraucht ist: Modell → Zeitpunkt, ab dem es wieder geht.
 # Google setzt das Kontingent um Mitternacht (Pazifik-Zeit) zurück.
@@ -41,13 +46,15 @@ class Gemini:
         quota_only = True
         available = [m for m in self.models if _exhausted.get(m, 0) < time.time()]
         async with httpx.AsyncClient(timeout=TIMEOUT) as http:
-            for model in available:
+            for i, model in enumerate(available):
+                timeout = FALLBACK_TIMEOUT if i < len(available) - 1 else TIMEOUT
                 for attempt in range(2):
                     try:
                         res = await http.post(
                             f"{API}/{model}:generateContent",
                             json=body,
                             headers={"x-goog-api-key": self.api_key},
+                            timeout=timeout,
                         )
                     except httpx.TimeoutException:
                         errors.append(f"{model}: Zeitüberschreitung")
@@ -59,6 +66,10 @@ class Gemini:
                         break
 
                     if res.is_success:
+                        if errors:
+                            log.warning(
+                                "Gemini-Ersatzmodell %s genutzt (%s)", model, "; ".join(errors)
+                            )
                         candidates = res.json().get("candidates") or []
                         if not candidates or "content" not in candidates[0]:
                             raise LlmError("Leere Antwort vom Modell")
