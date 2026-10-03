@@ -18,6 +18,7 @@ GROUPS = {
     "gym": "Sport: Training, Übungen, Trainingsplan, Rekorde",
     "essen": "Essen: Mahlzeiten, Kalorien, Protein, Ernährungsziele, Rezepte, Speisekarten",
     "mails": "E-Mails: lesen, suchen, zusammenfassen, beantworten, schreiben, löschen",
+    "erinnerungen": "Erinnerungen: 'erinner mich an …', Erinnerungen ansehen oder löschen",
 }
 
 # Tools, die zu mehreren Bereichen gehören

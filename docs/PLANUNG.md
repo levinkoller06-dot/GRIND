@@ -167,7 +167,7 @@ Alle Tabellen haben `user_id` und Row Level Security.
 | **2 – Gym & Essen** | Training + Mahlzeiten (Text und Foto), Tab mit Fortschritt | Täglicher Nutzen |
 | **3 – Google** | „Mit Google verbinden“ pro Nutzer, bestätigte Termine landen im Google Kalender, Google-Termine werden angezeigt | Echter Kalender |
 | **4 – Mails** | Gmail pro Nutzer: Zusammenfassung, Sortierung, Antwort-Entwürfe (mit Bestätigung) | Mail-Helfer |
-| **5 – Zeitplan & n8n** | n8n aufsetzen: Morgen-Check, Mail-Abruf, Erinnerungen | App meldet sich selbst |
+| **5 – Zeitplan** | Im Backend (statt n8n): Morgen-Check, Mail-Abruf, Erinnerungen als Meldungen im Gehirn-Tab. n8n später nur für allgemeine Daten (Free Games, Pakete) | App meldet sich selbst |
 | **6 – Lernen & Extras** | Lernplan, Karteikarten, Pakete, Geld, Freizeit | Alle Tabs |
 | **6b – Projekte** | Projekte-Tab: Ordner pro Projekt mit Aufgaben, Notizen, Dateien und Deadlines; Tools `projekt_anlegen`, `aufgabe_hinzufuegen` | Schul- und Privatprojekte im Griff |
 | **4b – Schul-Mail** | Microsoft 365 per Microsoft-Login (Graph API, App-Registrierung) ins gemeinsame Postfach | Alle drei Postfächer |

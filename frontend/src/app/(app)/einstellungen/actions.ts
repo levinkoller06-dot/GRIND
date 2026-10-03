@@ -28,3 +28,21 @@ export async function saveProfile(formData: FormData) {
 
   revalidatePath("/", "layout");
 }
+
+/** Uhrzeit für den Morgen-Check (leer = aus). Eigene Aktion, damit das Profil auch ohne
+ *  die Zeitplan-Migration speicherbar bleibt. */
+export async function saveMorningCheck(formData: FormData) {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getClaims();
+  const userId = data?.claims?.sub;
+  if (!userId) return;
+
+  const on = formData.get("morning_on") === "on";
+  const time = String(formData.get("morning_check_time") ?? "");
+  await supabase
+    .from("profiles")
+    .update({ morning_check_time: on && /^\d{2}:\d{2}$/.test(time) ? time : null })
+    .eq("id", userId);
+
+  revalidatePath("/einstellungen");
+}

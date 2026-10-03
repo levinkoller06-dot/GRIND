@@ -11,6 +11,12 @@ class Settings(BaseSettings):
     # Nur für ältere Supabase-Projekte mit HS256-Secret. Neue Projekte nutzen
     # asymmetrische Schlüssel, die über JWKS geladen werden.
     supabase_jwt_secret: str = ""
+    # Secret Key (sb_secret_...) für Zeitplan-Jobs ohne eingeloggten Nutzer. Leer = Jobs aus.
+    # Umgeht Row Level Security, darf nie ins Frontend!
+    supabase_secret_key: str = ""
+    # Alle X Sekunden prüfen (Erinnerungen, Morgen-Check), Mails alle X Minuten abrufen
+    jobs_interval_s: int = 60
+    mail_check_min: int = 15
 
     gemini_api_key: str = ""
     # Reihenfolge der Modelle: ist eines aufgebraucht/zu langsam, kommt das nächste dran

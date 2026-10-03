@@ -74,6 +74,7 @@ def test_vorauswahl_der_tools(monkeypatch):
             "gym": {"noul": 0.05},
             "essen": {"noul": 0.1},
             "mails": {"noul": 0.02},
+            "erinnerungen": {"noul": 0.03},
         },
     )
     groups = run(router.select_groups("Hab ne 5 in Mathe und Dienstag Zahnarzt", [], False))

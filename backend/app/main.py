@@ -1,5 +1,8 @@
 import asyncio
+import contextlib
 import logging
+from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
@@ -8,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from app import actions, harness, moodle, suggestions
+from app import actions, harness, jobs, moodle, suggestions
 from app.auth import UserDep
 from app.config import Settings, get_settings
 from app.db import Db, DbError
@@ -18,7 +21,22 @@ from app.mail.imap import PRESETS, MailError
 
 log = logging.getLogger(__name__)
 
-app = FastAPI(title="GRIND Backend")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    settings = get_settings()
+    if not settings.supabase_secret_key:
+        log.warning("SUPABASE_SECRET_KEY fehlt: Morgen-Check, Erinnerungen und Mail-Abruf sind aus")
+        yield
+        return
+    task = asyncio.create_task(jobs.run_forever(settings))
+    yield
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
+
+
+app = FastAPI(title="GRIND Backend", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -233,3 +251,36 @@ async def reject(action_id: str, db: DbDep) -> dict:
         return await actions.decide(db, action_id, False, {}, await user_tz(db))
     except actions.ActionError as e:
         raise HTTPException(400, str(e)) from e
+
+
+@app.get("/notifications")
+async def notifications(db: DbDep, settings: SettingsDep) -> dict:
+    rows = await db.select(
+        "notifications",
+        select="id,kind,title,body,link,created_at",
+        read_at="is.null",
+        order="created_at.desc",
+        limit="20",
+    )
+    return {"meldungen": rows, "zeitplan_aktiv": bool(settings.supabase_secret_key)}
+
+
+@app.post("/notifications/read-all")
+async def notifications_read_all(db: DbDep) -> dict:
+    await db.update("notifications", {"read_at": datetime.now(UTC).isoformat()}, read_at="is.null")
+    return {"ok": True}
+
+
+@app.post("/notifications/{notification_id}/read")
+async def notification_read(notification_id: str, db: DbDep) -> dict:
+    await db.update(
+        "notifications", {"read_at": datetime.now(UTC).isoformat()}, id=f"eq.{notification_id}"
+    )
+    return {"ok": True}
+
+
+@app.post("/jobs/morning-check")
+async def morning_check_now(db: DbDep) -> dict:
+    """Morgen-Check sofort erzeugen (Knopf "Jetzt testen" in den Einstellungen)."""
+    row = await jobs.morning_check(db, await user_tz(db), datetime.now(UTC), force=True)
+    return {"meldung": row}

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CountUp, ProgressRing } from "@/components/Animated";
 import { BackendStatus } from "@/components/BackendStatus";
 import { Chat } from "@/components/Chat";
+import { Notifications } from "@/components/Notifications";
 import { NowTimeline } from "@/components/NowTimeline";
 import type { CalEvent } from "@/lib/events";
 import { TZ, dayEnd, dayStart, formatDay, todayIso } from "@/lib/format";
@@ -136,6 +137,8 @@ export default async function StartPage() {
             </span>
           </Link>
         </section>
+
+        <Notifications />
 
         <NowTimeline events={events} />
 

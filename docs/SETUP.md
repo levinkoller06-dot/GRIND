@@ -32,6 +32,19 @@ Test: http://localhost:8000/health → `{"status":"ok"}` · API-Doku: http://loc
 
 Tests: `uv run pytest`
 
+### Zeitplan (Morgen-Check, Erinnerungen, Mail-Abruf)
+
+Läuft im Backend mit, solange es gestartet ist. Dafür in `backend/.env` den **Secret Key** eintragen
+(Supabase → Project Settings → API Keys → Secret keys, `sb_secret_...`):
+
+```
+SUPABASE_SECRET_KEY=sb_secret_...
+```
+
+Der Secret Key umgeht Row Level Security. Er gehört nur ins Backend, nie ins Frontend oder ins Repo.
+Ohne ihn startet das Backend normal, nur der Zeitplan ist aus. Die Uhrzeit des Morgen-Checks stellst
+du in der App unter Einstellungen ein. Dort gibt es auch „Jetzt testen“.
+
 ## 3. Frontend (App)
 
 ```bash

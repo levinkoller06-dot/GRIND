@@ -4,6 +4,7 @@ import { signOut } from "@/app/login/actions";
 import { SCALE_LABEL, type GradeScale } from "@/lib/grades";
 import { MailAccounts } from "@/components/MailAccounts";
 import { MoodleConnect } from "@/components/MoodleConnect";
+import { MorningCheck } from "@/components/MorningCheck";
 import { saveProfile } from "./actions";
 
 export default async function EinstellungenPage() {
@@ -12,6 +13,12 @@ export default async function EinstellungenPage() {
   const { data: profile } = await supabase
     .from("profiles")
     .select("display_name, grade_scale, goal_kcal, goal_protein_g")
+    .eq("id", data?.claims?.sub ?? "")
+    .maybeSingle();
+  // Getrennt abfragen: fehlt die Zeitplan-Migration, soll der Rest trotzdem laden
+  const { data: schedule, error: scheduleError } = await supabase
+    .from("profiles")
+    .select("morning_check_time")
     .eq("id", data?.claims?.sub ?? "")
     .maybeSingle();
 
@@ -67,6 +74,7 @@ export default async function EinstellungenPage() {
         </form>
       </section>
 
+      <MorningCheck time={scheduleError ? undefined : (schedule?.morning_check_time ?? null)} />
       <MailAccounts />
       <MoodleConnect />
     </div>
